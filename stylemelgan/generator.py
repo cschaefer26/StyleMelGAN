@@ -1,8 +1,7 @@
-from typing import Tuple, Union
+from typing import Tuple
 
 import torch
-import torch.nn as nn
-from torch.nn import Module, ModuleList, Sequential, LeakyReLU, utils, Conv1d, InstanceNorm1d, ConvTranspose1d, Tanh
+from torch.nn import Module, ModuleList, Sequential, LeakyReLU, Conv1d, ConvTranspose1d, Tanh
 from torch.nn.utils import weight_norm
 
 
@@ -53,10 +52,10 @@ class ResBlock(Module):
                  relu_slope: float = 0.2):
         super().__init__()
         self.conv_block = Sequential(
-            nn.LeakyReLU(relu_slope),
-            Conv1d(in_channels=in_channels, out_channels=out_channels,
-                   kernel_size=3, dilation=dilation, padding=dilation,
-                   padding_mode='reflect'),
+            LeakyReLU(relu_slope),
+            WNConv1d(in_channels=in_channels, out_channels=out_channels,
+                     kernel_size=3, dilation=dilation, padding=dilation,
+                     padding_mode='reflect'),
             LeakyReLU(relu_slope),
             WNConv1d(in_channels=out_channels, out_channels=out_channels,
                      kernel_size=1)
@@ -97,30 +96,29 @@ class MelganGenerator(Module):
                  channels: Tuple = (512, 256, 128, 64, 32),
                  res_layers: Tuple = (5, 7, 8, 9),
                  relu_slope: float = 0.2,
-                 padding_val: float = -11.5129
-                 ) -> None:
+                 padding_val: float = -11.5129) -> None:
         super().__init__()
 
         self.padding_val = padding_val
         self.mel_channels = mel_channels
         self.hop_length = 256
         c_0, c_1, c_2, c_3, c_4 = channels
-        r_1, r_2, r_3, r_4 = res_layers
+        r_0, r_1, r_2, r_3 = res_layers
 
         self.blocks = Sequential(
             WNConv1d(mel_channels, c_0, kernel_size=7, stride=1, padding=3, padding_mode='reflect'),
             LeakyReLU(relu_slope),
             WNConvTranspose1d(c_0, c_1, kernel_size=16, stride=8, padding=4),
-            ResStack(c_1, c_1, num_layers=r_1),
+            ResStack(c_1, c_1, num_layers=r_0),
             LeakyReLU(relu_slope),
             WNConvTranspose1d(c_1, c_2, kernel_size=16, stride=8, padding=4),
-            ResStack(c_2, c_2, num_layers=r_2),
+            ResStack(c_2, c_2, num_layers=r_1),
             LeakyReLU(relu_slope),
             WNConvTranspose1d(c_2, c_3, kernel_size=4, stride=2, padding=1),
-            ResStack(c_3, c_3, num_layers=r_3),
+            ResStack(c_3, c_3, num_layers=r_2),
             LeakyReLU(relu_slope),
             WNConvTranspose1d(c_3, c_4, kernel_size=4, stride=2, padding=1),
-            ResStack(c_4, c_4, num_layers=r_4),
+            ResStack(c_4, c_4, num_layers=r_3),
             LeakyReLU(relu_slope),
             WNConv1d(c_4, 1, kernel_size=7, padding=3, padding_mode='reflect'),
             Tanh()
