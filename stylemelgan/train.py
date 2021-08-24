@@ -56,30 +56,32 @@ if __name__ == '__main__':
             mel_seg = data['mel'].to(device)
             wav_seg = data['wav'].to(device)
 
-            # generator
-            g_optim.zero_grad()
             wav_fake = g_model(mel_seg)[:, :, :16000]
-            d_fake = d_model(wav_fake)
-            d_real = d_model(wav_seg)
-            g_loss = 0.0
-            for (feat_fake, score_fake), (feat_real, _) in zip(d_fake, d_real):
-                g_loss += torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
-                for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
-                    g_loss += 10. * torch.mean(torch.abs(feat_fake_i - feat_real_i))
-            g_loss.backward()
-            g_optim.step()
 
             # discriminator
-            wav_fake = wav_fake.detach()
-            d_optim.zero_grad()
-            d_fake = d_model(wav_fake)
+            d_fake = d_model(wav_fake.detach())
             d_real = d_model(wav_seg)
             d_loss = 0.0
             for (_, score_fake), (_, score_real) in zip(d_fake, d_real):
                 d_loss += torch.mean(torch.sum(torch.pow(score_real - 1.0, 2), dim=[1, 2]))
                 d_loss += torch.mean(torch.sum(torch.pow(score_fake, 2), dim=[1, 2]))
+            d_optim.zero_grad()
             d_loss.backward()
             d_optim.step()
+
+            # generator
+            d_fake = d_model(wav_fake)
+            d_real = d_real.detach()
+            g_loss = 0.0
+            for (feat_fake, score_fake), (feat_real, _) in zip(d_fake, d_real):
+                g_loss += torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
+                for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
+                    g_loss += 10. * torch.mean(torch.abs(feat_fake_i - feat_real_i))
+            g_optim.zero_grad()
+            g_loss.backward()
+            g_optim.step()
+
+
 
             pbar.set_description(desc=f'Epoch: {epoch} | Step {step} '
                                       f'| g_loss: {g_loss:#.4} | d_loss: {d_loss:#.4}', refresh=True)
