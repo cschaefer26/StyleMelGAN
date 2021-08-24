@@ -13,7 +13,7 @@ from stylemelgan.generator import MelganGenerator
 from matplotlib.figure import Figure
 import matplotlib as mpl
 from functools import partial
-from stylemelgan.losses import stft
+from stylemelgan.losses import stft, MultiResStftLoss
 
 mpl.use('agg')  # Use non-interactive backend by default
 import numpy as np
@@ -40,6 +40,8 @@ if __name__ == '__main__':
     g_optim = torch.optim.Adam(g_model.parameters(), lr=1e-4, betas=(0.5, 0.9))
     d_optim = torch.optim.Adam(d_model.parameters(), lr=1e-4, betas=(0.5, 0.9))
 
+    multires_stft_loss = MultiResStftLoss().to(device)
+
     try:
         checkpoint = torch.load('checkpoints/latest_model.pt', map_location=device)
         g_model.load_state_dict(checkpoint['g_model'])
@@ -50,10 +52,10 @@ if __name__ == '__main__':
     except Exception as e:
         print(e)
 
-    #train_data_path = Path('/home/sysgen/chris/data/asvoice2_splitted_train')
-    #val_data_path = Path('/home/sysgen/chris/data/asvoice2_splitted_val')
-    train_data_path = Path('/Users/cschaefe/datasets/asvoice2_splitted_train')
-    val_data_path = Path('/Users/cschaefe/datasets/asvoice2_splitted_val')
+    train_data_path = Path('/home/sysgen/chris/data/asvoice2_splitted_train')
+    val_data_path = Path('/home/sysgen/chris/data/asvoice2_splitted_val')
+    #train_data_path = Path('/Users/cschaefe/datasets/asvoice2_splitted_train')
+    #val_data_path = Path('/Users/cschaefe/datasets/asvoice2_splitted_val')
     dataloader = new_dataloader(data_path=train_data_path, segment_len=16000, hop_len=256, batch_size=16)
     val_dataset = AudioDataset(data_path=val_data_path, segment_len=None, hop_len=256)
 
@@ -95,10 +97,7 @@ if __name__ == '__main__':
                     for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
                         g_loss += 10. * torch.mean(torch.abs(feat_fake_i - feat_real_i.detach()))
             else:
-                stft_fake = stft(wav_fake.squeeze(1))
-                stft_real = stft(wav_real.squeeze(1))
-                stft_norm_loss = F.l1_loss(torch.log(stft_fake), torch.log(stft_real))
-                stft_spec_loss = torch.norm(stft_real - stft_fake, p="fro") / torch.norm(stft_real, p="fro")
+                stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
             g_loss_all = g_loss + stft_norm_loss + stft_spec_loss
 
             g_optim.zero_grad()
