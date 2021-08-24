@@ -1,3 +1,7 @@
+import yaml
+
+from typing import Dict, Any
+
 from torch.nn import Module
 from torch.nn.utils import remove_weight_norm
 
@@ -24,3 +28,14 @@ def remove_weight_norm_recursively(model: Module) -> None:
             print(l)
         except Exception as e:
             pass
+
+
+def read_config(path: str) -> Dict[str, Any]:
+    with open(path, 'r') as stream:
+        config = yaml.load(stream, Loader=yaml.FullLoader)
+    return config
+
+
+def save_config(config: Dict[str, Any], path: str) -> None:
+    with open(path, 'w+', encoding='utf-8') as stream:
+        yaml.dump(config, stream, default_flow_style=False)

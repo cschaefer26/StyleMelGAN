@@ -8,7 +8,7 @@ from typing import Dict, Any, Union
 class Audio:
 
     def __init__(self,
-                 num_mels: int,
+                 n_mels: int,
                  sample_rate: int,
                  hop_length: int,
                  win_length: int,
@@ -16,7 +16,7 @@ class Audio:
                  fmin: float,
                  fmax: float) -> None:
 
-        self.n_mels = num_mels
+        self.n_mels = n_mels
         self.sample_rate = sample_rate
         self.hop_length = hop_length
         self.win_length = win_length

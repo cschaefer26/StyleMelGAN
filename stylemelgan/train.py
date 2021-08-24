@@ -14,6 +14,7 @@ from matplotlib.figure import Figure
 import matplotlib as mpl
 from functools import partial
 from stylemelgan.losses import stft, MultiResStftLoss
+from stylemelgan.utils import read_config
 
 mpl.use('agg')  # Use non-interactive backend by default
 import numpy as np
@@ -29,16 +30,21 @@ def plot_mel(mel: np.array) -> Figure:
 
 if __name__ == '__main__':
 
+    config = read_config('configs/melgan_config.yaml')
+    audio = Audio.from_config(config)
+    train_data_path = Path(config['paths']['train_dir'])
+    val_data_path = Path(config['paths']['val_dir'])
+
     device = torch.device('cuda') if is_available() else torch.device('cpu')
     torch.backends.cudnn.benchmark = True
 
     step = 0
 
-    g_model = MelganGenerator(80).to(device)
+    g_model = MelganGenerator(audio.n_mels).to(device)
     d_model = MultiScaleDiscriminator().to(device)
-
-    g_optim = torch.optim.Adam(g_model.parameters(), lr=1e-4, betas=(0.5, 0.9))
-    d_optim = torch.optim.Adam(d_model.parameters(), lr=1e-4, betas=(0.5, 0.9))
+    train_cfg = config['training']
+    g_optim = torch.optim.Adam(g_model.parameters(), lr=train_cfg['g_lr'], betas=(0.5, 0.9))
+    d_optim = torch.optim.Adam(d_model.parameters(), lr=train_cfg['d_lr'], betas=(0.5, 0.9))
 
     multires_stft_loss = MultiResStftLoss().to(device)
 
@@ -52,15 +58,10 @@ if __name__ == '__main__':
     except Exception as e:
         print(e)
 
-    train_data_path = Path('/home/sysgen/chris/data/asvoice2_splitted_train')
-    val_data_path = Path('/home/sysgen/chris/data/asvoice2_splitted_val')
-    #train_data_path = Path('/Users/cschaefe/datasets/asvoice2_splitted_train')
-    #val_data_path = Path('/Users/cschaefe/datasets/asvoice2_splitted_val')
     dataloader = new_dataloader(data_path=train_data_path, segment_len=16000, hop_len=256, batch_size=16)
     val_dataset = AudioDataset(data_path=val_data_path, segment_len=None, hop_len=256)
 
     stft = partial(stft, n_fft=1024, hop_length=256, win_length=1024)
-    audio = Audio(num_mels=80, sample_rate=22050, hop_length=256, win_length=1024, n_fft=1024, fmin=0, fmax=8000)
 
     pretraining_steps = 10000
 
@@ -96,8 +97,8 @@ if __name__ == '__main__':
                     g_loss += torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
                     for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
                         g_loss += 10. * torch.mean(torch.abs(feat_fake_i - feat_real_i.detach()))
-            else:
-                stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
+
+            stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
             g_loss_all = g_loss + stft_norm_loss + stft_spec_loss
 
             g_optim.zero_grad()
@@ -137,5 +138,6 @@ if __name__ == '__main__':
             'g_optim': g_optim.state_dict(),
             'd_model': d_model.state_dict(),
             'd_optim': d_optim.state_dict(),
+            'config': config,
             'step': step
         }, 'checkpoints/latest_model.pt')
