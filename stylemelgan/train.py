@@ -8,11 +8,24 @@ from torch.utils.tensorboard import SummaryWriter
 from stylemelgan.dataset import new_dataloader, AudioDataset
 from stylemelgan.discriminator import MultiScaleDiscriminator
 from stylemelgan.generator import MelganGenerator
+from matplotlib.figure import Figure
+import matplotlib as mpl
+mpl.use('agg')  # Use non-interactive backend by default
+import numpy as np
+import matplotlib.pyplot as plt
+
+
+def plot_wav(wav: np.array, color='blue') -> Figure:
+    fig = plt.figure(figsize=(12, 6), dpi=100)
+    plt.plot(wav, color=color)
+    return fig
 
 
 if __name__ == '__main__':
 
     device = torch.device('cuda') if is_available() else torch.device('cpu')
+
+    step = 0
 
     g_model = MelganGenerator(80).to(device)
     d_model = MultiScaleDiscriminator().to(device)
@@ -20,16 +33,25 @@ if __name__ == '__main__':
     g_optim = torch.optim.Adam(g_model.parameters(), lr=1e-4, betas=(0.5, 0.9))
     d_optim = torch.optim.Adam(d_model.parameters(), lr=1e-4, betas=(0.5, 0.9))
 
+    try:
+        checkpoint = torch.load('checkpoints/latest_model.pt', map_location=torch.device('cpu'))
+        g_model.load_state_dict(checkpoint['g_model'])
+        g_optim.load_state_dict(checkpoint['g_optim'])
+        d_model.load_state_dict(checkpoint['d_model'])
+        d_optim.load_state_dict(checkpoint['d_optim'])
+        step = checkpoint['step']
+    except Exception as e:
+        print(e)
+
     train_data_path = Path('/Users/cschaefe/datasets/asvoice2_splitted_train')
     val_data_path = Path('/Users/cschaefe/datasets/asvoice2_splitted_val')
-    dataloader = new_dataloader(data_path=train_data_path, segment_len=16000, hop_len=256, batch_size=16)
+    dataloader = new_dataloader(data_path=train_data_path, segment_len=16000, hop_len=256, batch_size=2)
     val_dataset = AudioDataset(data_path=val_data_path, segment_len=None, hop_len=256)
 
     summary_writer = SummaryWriter(log_dir='checkpoints/logs')
 
-    pbar = tqdm.tqdm(enumerate(dataloader, 1), total=len(dataloader))
-    step = 0
     for epoch in range(100):
+        pbar = tqdm.tqdm(enumerate(dataloader, 1), total=len(dataloader))
         for data in dataloader:
             step += 1
             mel_seg = data['mel'].to(device)
@@ -61,19 +83,24 @@ if __name__ == '__main__':
             d_optim.step()
 
             pbar.set_description(desc=f'Epoch: {epoch} | Step {step} '
-                                      f'| g_loss: {g_loss:#.4} | d_loss: {d_loss}', refresh=True)
+                                      f'| g_loss: {g_loss:#.4} | d_loss: {d_loss:#.4}', refresh=True)
 
             summary_writer.add_scalar('generator_loss', g_loss, global_step=step)
             summary_writer.add_scalar('discriminator_loss', d_loss, global_step=step)
 
-            if step % 1000 == 1:
-                print('generating audio')
+            if step % 10000 == 1:
+                g_model.eval()
                 val_mel = val_dataset[0]['mel'].to(device)
                 val_mel = val_mel.unsqueeze(0)
                 wav_fake = g_model.inference(val_mel)
                 wav_real = val_dataset[0]['wav'].detach().numpy()
+                g_model.train()
                 summary_writer.add_audio('generated', wav_fake, sample_rate=22050, global_step=step)
                 summary_writer.add_audio('target', wav_real, sample_rate=22050, global_step=step)
+                #wav_fake_plot = plot_wav(wav_fake)
+                #wav_real_plot = plot_wav(wav_real)
+                #summary_writer.add_figure('image_generated', wav_fake_plot, global_step=step)
+                #summary_writer.add_figure('image_target', wav_real_plot, global_step=step)
 
         # epoch end
         torch.save({

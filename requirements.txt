@@ -2,3 +2,4 @@ torch >= 1.7
 tensorboard
 librosa
 tqdm
+matplotlib
