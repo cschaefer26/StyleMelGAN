@@ -49,10 +49,9 @@ if __name__ == '__main__':
     val_dataset = AudioDataset(data_path=val_data_path, segment_len=None, hop_len=256)
 
     summary_writer = SummaryWriter(log_dir='checkpoints/logs')
-
     for epoch in range(100):
         pbar = tqdm.tqdm(enumerate(dataloader, 1), total=len(dataloader))
-        for data in pbar:
+        for i, data in pbar:
             step += 1
             mel_seg = data['mel'].to(device)
             wav_seg = data['wav'].to(device)
