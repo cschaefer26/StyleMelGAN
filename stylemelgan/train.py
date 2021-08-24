@@ -24,6 +24,7 @@ def plot_wav(wav: np.array, color='blue') -> Figure:
 if __name__ == '__main__':
 
     device = torch.device('cuda') if is_available() else torch.device('cpu')
+    torch.backends.cudnn.benchmark = True
 
     step = 0
 
