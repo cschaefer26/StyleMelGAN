@@ -52,7 +52,7 @@ if __name__ == '__main__':
 
     for epoch in range(100):
         pbar = tqdm.tqdm(enumerate(dataloader, 1), total=len(dataloader))
-        for data in dataloader:
+        for data in pbar:
             step += 1
             mel_seg = data['mel'].to(device)
             wav_seg = data['wav'].to(device)
