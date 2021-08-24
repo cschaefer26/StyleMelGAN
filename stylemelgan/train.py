@@ -50,10 +50,10 @@ if __name__ == '__main__':
     except Exception as e:
         print(e)
 
-    train_data_path = Path('/home/sysgen/chris/data/asvoice2_splitted_train')
-    val_data_path = Path('/home/sysgen/chris/data/asvoice2_splitted_val')
-    #train_data_path = Path('/Users/cschaefe/datasets/asvoice2_splitted_train')
-    #val_data_path = Path('/Users/cschaefe/datasets/asvoice2_splitted_val')
+    #train_data_path = Path('/home/sysgen/chris/data/asvoice2_splitted_train')
+    #val_data_path = Path('/home/sysgen/chris/data/asvoice2_splitted_val')
+    train_data_path = Path('/Users/cschaefe/datasets/asvoice2_splitted_train')
+    val_data_path = Path('/Users/cschaefe/datasets/asvoice2_splitted_val')
     dataloader = new_dataloader(data_path=train_data_path, segment_len=16000, hop_len=256, batch_size=16)
     val_dataset = AudioDataset(data_path=val_data_path, segment_len=None, hop_len=256)
 
@@ -72,10 +72,10 @@ if __name__ == '__main__':
 
             wav_fake = g_model(mel)[:, :, :16000]
 
-
             d_loss = 0.0
             g_loss = 0.0
-            stft_loss = 0.0
+            stft_norm_loss = 0.0
+            stft_spec_loss = 0.0
 
             if step > pretraining_steps:
                 # discriminator
@@ -97,20 +97,23 @@ if __name__ == '__main__':
             else:
                 stft_fake = stft(wav_fake.squeeze(1))
                 stft_real = stft(wav_real.squeeze(1))
-                stft_loss = F.l1_loss(torch.log(stft_fake), torch.log(stft_real))
-
-            g_loss_all = g_loss + stft_loss
+                stft_norm_loss = F.l1_loss(torch.log(stft_fake), torch.log(stft_real))
+                stft_spec_loss = torch.norm(stft_real - stft_fake, p="fro") / torch.norm(stft_real, p="fro")
+            g_loss_all = g_loss + stft_norm_loss + stft_spec_loss
 
             g_optim.zero_grad()
             g_loss_all.backward()
             g_optim.step()
 
             pbar.set_description(desc=f'Epoch: {epoch} | Step {step} '
-                                      f'| g_loss: {g_loss:#.4} | d_loss: {d_loss:#.4} '
-                                      f'| stft_loss {stft_loss:#.4}', refresh=True)
+                                      f'| g_loss: {g_loss:#.4} '
+                                      f'| d_loss: {d_loss:#.4} '
+                                      f'| stft_norm_loss {stft_norm_loss:#.4} '
+                                      f'| stft_spec_loss {stft_spec_loss:#.4} ', refresh=True)
 
             summary_writer.add_scalar('generator_loss', g_loss, global_step=step)
-            summary_writer.add_scalar('stft_loss', stft_loss, global_step=step)
+            summary_writer.add_scalar('stft_norm_loss', stft_norm_loss, global_step=step)
+            summary_writer.add_scalar('stft_spec_loss', stft_spec_loss, global_step=step)
             summary_writer.add_scalar('discriminator_loss', d_loss, global_step=step)
 
             if step % 1000 == 1:
