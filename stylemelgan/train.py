@@ -60,7 +60,7 @@ if __name__ == '__main__':
     stft = partial(stft, n_fft=1024, hop_length=256, win_length=1024)
     audio = Audio(num_mels=80, sample_rate=22050, hop_length=256, win_length=1024, n_fft=1024, fmin=0, fmax=8000)
 
-    pretraining_steps = 100000
+    pretraining_steps = 10000
 
     summary_writer = SummaryWriter(log_dir='checkpoints/logs')
     for epoch in range(100):
@@ -113,7 +113,7 @@ if __name__ == '__main__':
             summary_writer.add_scalar('stft_loss', stft_loss, global_step=step)
             summary_writer.add_scalar('discriminator_loss', d_loss, global_step=step)
 
-            if step % 10000 == 1:
+            if step % 1000 == 1:
                 g_model.eval()
                 val_mel = val_dataset[0]['mel'].to(device)
                 val_mel = val_mel.unsqueeze(0)
