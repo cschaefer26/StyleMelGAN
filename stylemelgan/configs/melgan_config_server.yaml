@@ -17,3 +17,7 @@ audio:
 training:
   batch_size: 16
   segment_len: 16000
+  g_lr: 0.0001
+  d_lr: 0.0001
+  stft_spec_loss_weight: 1.
+  stft_norm_loss_weight: 1.
