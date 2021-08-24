@@ -13,7 +13,7 @@ def stft(x: torch.Tensor,
          n_fft: int,
          hop_length: int,
          win_length: int) -> torch.Tensor:
-    window = torch.hann_window(win_length)
+    window = torch.hann_window(win_length, device=x.device)
     if is_pytorch_17plus:
         x_stft = torch.stft(
             input=x, n_fft=n_fft, hop_length=hop_length,

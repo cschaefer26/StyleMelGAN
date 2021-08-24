@@ -50,10 +50,10 @@ if __name__ == '__main__':
     except Exception as e:
         print(e)
 
-    #train_data_path = Path('/home/sysgen/chris/data/asvoice2_splitted_train')
-    #val_data_path = Path('/home/sysgen/chris/data/asvoice2_splitted_val')
-    train_data_path = Path('/Users/cschaefe/datasets/asvoice2_splitted_train')
-    val_data_path = Path('/Users/cschaefe/datasets/asvoice2_splitted_val')
+    train_data_path = Path('/home/sysgen/chris/data/asvoice2_splitted_train')
+    val_data_path = Path('/home/sysgen/chris/data/asvoice2_splitted_val')
+    #train_data_path = Path('/Users/cschaefe/datasets/asvoice2_splitted_train')
+    #val_data_path = Path('/Users/cschaefe/datasets/asvoice2_splitted_val')
     dataloader = new_dataloader(data_path=train_data_path, segment_len=16000, hop_len=256, batch_size=16)
     val_dataset = AudioDataset(data_path=val_data_path, segment_len=None, hop_len=256)
 
