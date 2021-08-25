@@ -105,14 +105,14 @@ class MelganGenerator(Module):
 
 
 if __name__ == '__main__':
-    import time
     model = MelganGenerator(80)
 
-    start = time.time()
     x = torch.randn(3, 80, 1000)
-    y = model(x)
-    dur = time.time() - start
     print(x.shape)
+
+    y = model(x)
     print(y.shape)
-    print(f'dur: {dur}')
     #assert y.shape == torch.Size([3, 1, 2560])
+
+    pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(pytorch_total_params)

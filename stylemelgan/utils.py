@@ -25,7 +25,6 @@ def remove_weight_norm_recursively(model: Module) -> None:
     for l in layers:
         try:
             remove_weight_norm(l)
-            print(l)
         except Exception as e:
             pass
 
