@@ -1,8 +1,7 @@
 from typing import Tuple
 
 import torch
-from torch.nn import Module, ModuleList, Sequential, LeakyReLU, Conv1d, ConvTranspose1d, Tanh
-from torch.nn.utils import weight_norm
+from torch.nn import Module, ModuleList, Sequential, LeakyReLU, Tanh
 
 from stylemelgan.common import WNConv1d, WNConvTranspose1d
 
