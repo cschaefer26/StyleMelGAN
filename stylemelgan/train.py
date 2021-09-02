@@ -30,7 +30,7 @@ def plot_mel(mel: np.array) -> Figure:
 
 if __name__ == '__main__':
 
-    config = read_config('stylemelgan/configs/melgan_config.yaml')
+    config = read_config('stylemelgan/configs/melgan_config_server.yaml')
     audio = Audio.from_config(config)
     train_data_path = Path(config['paths']['train_dir'])
     val_data_path = Path(config['paths']['val_dir'])
@@ -65,7 +65,7 @@ if __name__ == '__main__':
 
     pretraining_steps = 0
 
-    summary_writer = SummaryWriter(log_dir='checkpoints/logs')
+    summary_writer = SummaryWriter(log_dir='checkpoints/logs_nostft')
 
     best_stft = 9999
 
