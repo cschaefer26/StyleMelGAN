@@ -119,7 +119,7 @@ if __name__ == '__main__':
             summary_writer.add_scalar('stft_spec_loss', stft_spec_loss, global_step=step)
             summary_writer.add_scalar('discriminator_loss', d_loss, global_step=step)
 
-            if step % 1 == 0:
+            if step % 1000 == 0:
                 g_model.eval()
                 val_mel = val_dataset[0]['mel'].to(device)
                 val_mel = val_mel.unsqueeze(0)
@@ -128,7 +128,8 @@ if __name__ == '__main__':
 
                 wav_f = torch.tensor(wav_fake).unsqueeze(0).to(device)
                 wav_r = torch.tensor(wav_real).unsqueeze(0).to(device)
-                val_n, val_s = multires_stft_loss(wav_f, wav_r)
+                size = min(wav_r.size(-1), wav_f.size(-1))
+                val_n, val_s = multires_stft_loss(wav_f[..., :size], wav_r[..., :size])
 
                 if val_n + val_s < best_stft:
                     best_stft = val_n + val_s
