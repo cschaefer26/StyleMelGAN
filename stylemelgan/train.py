@@ -123,17 +123,20 @@ if __name__ == '__main__':
                 g_model.eval()
                 val_mel = val_dataset[0]['mel'].to(device)
                 val_mel = val_mel.unsqueeze(0)
-                wav_fake = g_model.inference(val_mel).squeeze().cpu().numpy()
+                wav_fake = g_model.inference(val_mel, pad_steps=80).squeeze().cpu().numpy()
                 wav_real = val_dataset[0]['wav'].detach().squeeze().cpu().numpy()
 
                 wav_f = torch.tensor(wav_fake).unsqueeze(0).to(device)
                 wav_r = torch.tensor(wav_real).unsqueeze(0).to(device)
                 size = min(wav_r.size(-1), wav_f.size(-1))
                 val_n, val_s = multires_stft_loss(wav_f[..., :size], wav_r[..., :size])
+                summary_writer.add_scalar('val_stft_norm_loss', val_n, global_step=step)
+                summary_writer.add_scalar('val_stft_spec_loss', val_s, global_step=step)
+                print(f'\nbest stft {best_stft}, new stft: {val_n + val_s}')
 
                 if val_n + val_s < best_stft:
                     best_stft = val_n + val_s
-                    print(f'new best stft: {best_stft}')
+                    print(f'\nnew best stft: {best_stft}')
                     torch.save({
                         'g_model': g_model.state_dict(),
                         'g_optim': g_optim.state_dict(),
