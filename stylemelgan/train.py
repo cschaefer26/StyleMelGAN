@@ -69,7 +69,7 @@ if __name__ == '__main__':
 
     best_stft = 9999
 
-    for epoch in range(100):
+    for epoch in range(10000):
         pbar = tqdm.tqdm(enumerate(dataloader, 1), total=len(dataloader))
         for i, data in pbar:
             step += 1
