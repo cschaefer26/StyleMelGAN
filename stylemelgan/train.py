@@ -135,6 +135,8 @@ if __name__ == '__main__':
                     val_wavs.append((wav_fake, wav_real))
                     size = min(wav_r.size(-1), wav_f.size(-1))
                     val_n, val_s = multires_stft_loss(wav_f[..., :size], wav_r[..., :size])
+                    val_norm_loss += val_n
+                    val_spec_loss += val_s
 
                 val_norm_loss /= len(val_dataset)
                 val_spec_loss /= len(val_dataset)
