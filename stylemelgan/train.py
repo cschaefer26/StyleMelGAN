@@ -30,7 +30,7 @@ def plot_mel(mel: np.array) -> Figure:
 
 if __name__ == '__main__':
 
-    config = read_config('stylemelgan/configs/melgan_config.yaml')
+    config = read_config('stylemelgan/configs/melgan_config_server.yaml')
     audio = Audio.from_config(config)
     train_data_path = Path(config['paths']['train_dir'])
     val_data_path = Path(config['paths']['val_dir'])
@@ -49,7 +49,7 @@ if __name__ == '__main__':
     multires_stft_loss = MultiResStftLoss().to(device)
 
     try:
-        checkpoint = torch.load('checkpoints/latest_model.pt', map_location=device)
+        checkpoint = torch.load('checkpoints/latest_model_nostft.pt', map_location=device)
         g_model.load_state_dict(checkpoint['g_model'])
         g_optim.load_state_dict(checkpoint['g_optim'])
         d_model.load_state_dict(checkpoint['d_model'])
@@ -65,7 +65,7 @@ if __name__ == '__main__':
 
     pretraining_steps = 0
 
-    summary_writer = SummaryWriter(log_dir='checkpoints/logs')
+    summary_writer = SummaryWriter(log_dir='checkpoints/logs_nostft')
 
     best_stft = 9999
 
@@ -140,7 +140,7 @@ if __name__ == '__main__':
                 val_spec_loss /= len(val_dataset)
                 summary_writer.add_scalar('val_stft_norm_loss', val_norm_loss, global_step=step)
                 summary_writer.add_scalar('val_stft_spec_loss', val_spec_loss, global_step=step)
-                val_wavs.sort(key=lambda x: x[1].size(-1))
+                val_wavs.sort(key=lambda x: x[1].shape[0])
                 wav_fake, wav_real = val_wavs[-1]
                 if val_norm_loss + val_spec_loss < best_stft:
                     best_stft = val_norm_loss + val_spec_loss
@@ -152,7 +152,7 @@ if __name__ == '__main__':
                         'd_optim': d_optim.state_dict(),
                         'config': config,
                         'step': step
-                    }, 'checkpoints/best_model.pt')
+                    }, 'checkpoints/best_model_nostft.pt')
                     summary_writer.add_audio('best_generated', wav_fake, sample_rate=audio.sample_rate, global_step=step)
 
                 g_model.train()
@@ -173,4 +173,4 @@ if __name__ == '__main__':
             'd_optim': d_optim.state_dict(),
             'config': config,
             'step': step
-        }, 'checkpoints/latest_model.pt')
+        }, 'checkpoints/latest_model_nostft.pt')
