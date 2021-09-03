@@ -30,7 +30,7 @@ def plot_mel(mel: np.array) -> Figure:
 
 if __name__ == '__main__':
 
-    config = read_config('stylemelgan/configs/melgan_config_server.yaml')
+    config = read_config('stylemelgan/configs/melgan_config.yaml')
     audio = Audio.from_config(config)
     train_data_path = Path(config['paths']['train_dir'])
     val_data_path = Path(config['paths']['val_dir'])
@@ -121,21 +121,29 @@ if __name__ == '__main__':
 
             if step % 1000 == 0:
                 g_model.eval()
-                val_mel = val_dataset[0]['mel'].to(device)
-                val_mel = val_mel.unsqueeze(0)
-                wav_fake = g_model.inference(val_mel, pad_steps=80).squeeze().cpu().numpy()
-                wav_real = val_dataset[0]['wav'].detach().squeeze().cpu().numpy()
+                val_norm_loss = 0
+                val_spec_loss = 0
+                val_wavs = []
 
-                wav_f = torch.tensor(wav_fake).unsqueeze(0).to(device)
-                wav_r = torch.tensor(wav_real).unsqueeze(0).to(device)
-                size = min(wav_r.size(-1), wav_f.size(-1))
-                val_n, val_s = multires_stft_loss(wav_f[..., :size], wav_r[..., :size])
-                summary_writer.add_scalar('val_stft_norm_loss', val_n, global_step=step)
-                summary_writer.add_scalar('val_stft_spec_loss', val_s, global_step=step)
-                print(f'\nbest stft {best_stft}, new stft: {val_n + val_s}')
+                for i, val_data in enumerate(val_dataset):
+                    val_mel = val_data['mel'].to(device)
+                    val_mel = val_mel.unsqueeze(0)
+                    wav_fake = g_model.inference(val_mel, pad_steps=80).squeeze().cpu().numpy()
+                    wav_real = val_data['wav'].detach().squeeze().cpu().numpy()
+                    wav_f = torch.tensor(wav_fake).unsqueeze(0).to(device)
+                    wav_r = torch.tensor(wav_real).unsqueeze(0).to(device)
+                    val_wavs.append((wav_fake, wav_real))
+                    size = min(wav_r.size(-1), wav_f.size(-1))
+                    val_n, val_s = multires_stft_loss(wav_f[..., :size], wav_r[..., :size])
 
-                if val_n + val_s < best_stft:
-                    best_stft = val_n + val_s
+                val_norm_loss /= len(val_dataset)
+                val_spec_loss /= len(val_dataset)
+                summary_writer.add_scalar('val_stft_norm_loss', val_norm_loss, global_step=step)
+                summary_writer.add_scalar('val_stft_spec_loss', val_spec_loss, global_step=step)
+                val_wavs.sort(key=lambda x: x[1].size(-1))
+                wav_fake, wav_real = val_wavs[-1]
+                if val_norm_loss + val_spec_loss < best_stft:
+                    best_stft = val_norm_loss + val_spec_loss
                     print(f'\nnew best stft: {best_stft}')
                     torch.save({
                         'g_model': g_model.state_dict(),
