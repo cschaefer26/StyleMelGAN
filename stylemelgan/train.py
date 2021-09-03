@@ -58,7 +58,7 @@ if __name__ == '__main__':
     except Exception as e:
         print(e)
 
-    dataloader = new_dataloader(data_path=train_data_path, segment_len=16000, hop_len=256, batch_size=16)
+    dataloader = new_dataloader(data_path=train_data_path, segment_len=16000, hop_len=256, batch_size=16, num_workers=4)
     val_dataset = AudioDataset(data_path=val_data_path, segment_len=None, hop_len=256)
 
     stft = partial(stft, n_fft=1024, hop_length=256, win_length=1024)
@@ -119,7 +119,7 @@ if __name__ == '__main__':
             summary_writer.add_scalar('stft_spec_loss', stft_spec_loss, global_step=step)
             summary_writer.add_scalar('discriminator_loss', d_loss, global_step=step)
 
-            if step % 1000 == 0:
+            if step % 10000 == 0:
                 g_model.eval()
                 val_norm_loss = 0
                 val_spec_loss = 0
