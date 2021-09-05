@@ -65,7 +65,7 @@ if __name__ == '__main__':
 
     pretraining_steps = 0
 
-    summary_writer = SummaryWriter(log_dir='checkpoints/logs_nostft')
+    summary_writer = SummaryWriter(log_dir='checkpoints/logs_nostft_fixed')
 
     best_stft = 9999
 
@@ -89,7 +89,7 @@ if __name__ == '__main__':
                 d_real = d_model(wav_real)
                 for (_, score_fake), (_, score_real) in zip(d_fake, d_real):
                     d_loss += torch.mean(torch.sum(torch.pow(score_real - 1.0, 2), dim=[1, 2]))
-                    d_loss += torch.mean(torch.sum(torch.pow(score_fake, 2), dim=[1, 2]))
+                    d_loss += torch.mean(torch.sum(torch.pow(1.0 - score_fake, 2), dim=[1, 2]))
                 d_optim.zero_grad()
                 d_loss.backward()
                 d_optim.step()
