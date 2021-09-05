@@ -49,7 +49,7 @@ if __name__ == '__main__':
     multires_stft_loss = MultiResStftLoss().to(device)
 
     try:
-        checkpoint = torch.load('checkpoints/latest_model.pt', map_location=device)
+        checkpoint = torch.load('checkpoints/latest_model_nostft.pt', map_location=device)
         g_model.load_state_dict(checkpoint['g_model'])
         g_optim.load_state_dict(checkpoint['g_optim'])
         d_model.load_state_dict(checkpoint['d_model'])
@@ -65,7 +65,7 @@ if __name__ == '__main__':
 
     pretraining_steps = 0
 
-    summary_writer = SummaryWriter(log_dir='checkpoints/logs')
+    summary_writer = SummaryWriter(log_dir='checkpoints/logs_nostft_feat1')
 
     best_stft = 9999
 
@@ -99,7 +99,7 @@ if __name__ == '__main__':
                 for (feat_fake, score_fake), (feat_real, _) in zip(d_fake, d_real):
                     g_loss += torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
                     for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
-                        g_loss += 10. * torch.mean(torch.abs(feat_fake_i - feat_real_i.detach()))
+                        g_loss += 1. * torch.mean(torch.abs(feat_fake_i - feat_real_i.detach()))
 
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
             g_loss_all = g_loss + stft_norm_loss + stft_spec_loss
@@ -154,7 +154,7 @@ if __name__ == '__main__':
                         'd_optim': d_optim.state_dict(),
                         'config': config,
                         'step': step
-                    }, 'checkpoints/best_model.pt')
+                    }, 'checkpoints/best_model_nostft_feat1.pt')
                     summary_writer.add_audio('best_generated', wav_fake, sample_rate=audio.sample_rate, global_step=step)
 
                 g_model.train()
@@ -175,4 +175,4 @@ if __name__ == '__main__':
             'd_optim': d_optim.state_dict(),
             'config': config,
             'step': step
-        }, 'checkpoints/latest_model.pt')
+        }, 'checkpoints/latest_model_nostft_feat1.pt')
