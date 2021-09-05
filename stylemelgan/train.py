@@ -102,7 +102,7 @@ if __name__ == '__main__':
                         g_loss += 10. * torch.mean(torch.abs(feat_fake_i - feat_real_i.detach()))
 
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
-            g_loss_all = g_loss + stft_norm_loss + stft_spec_loss
+            g_loss_all = g_loss # + stft_norm_loss + stft_spec_loss
 
             g_optim.zero_grad()
             g_loss_all.backward()
