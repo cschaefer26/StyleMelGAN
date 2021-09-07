@@ -67,7 +67,7 @@ if __name__ == '__main__':
 
     stft = partial(stft, n_fft=1024, hop_length=256, win_length=1024)
 
-    pretraining_steps = 0
+    pretraining_steps = 50000
 
     summary_writer = SummaryWriter(log_dir='checkpoints/logs_neurips_specdisc_nostft')
 
@@ -129,7 +129,11 @@ if __name__ == '__main__':
                         g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
-            g_loss_all = g_loss # + stft_norm_loss + stft_spec_loss
+            factor = 1.
+            if step > pretraining_steps:
+                factor = 0.
+
+            g_loss_all = g_loss + factor * (stft_norm_loss + stft_spec_loss)
 
             g_optim.zero_grad()
             g_loss_all.backward()
