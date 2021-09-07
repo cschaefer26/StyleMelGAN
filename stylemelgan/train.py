@@ -102,7 +102,7 @@ if __name__ == '__main__':
                 # spec discriminator
                 d_spec_fake = d_spec_model(wav_fake.detach())
                 d_spec_real = d_spec_model(wav_real.detach())
-                for (_, score_fake), (_, score_real) in zip(d_fake, d_real):
+                for (_, score_fake), (_, score_real) in zip(d_spec_fake, d_spec_real):
                     d_spec_loss += F.relu(1.0 - score_real).mean()
                     d_spec_loss += F.relu(1.0 + score_fake).mean()
 
