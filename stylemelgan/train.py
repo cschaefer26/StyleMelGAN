@@ -8,7 +8,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from stylemelgan.audio import Audio
 from stylemelgan.dataset import new_dataloader, AudioDataset
-from stylemelgan.discriminator import MultiScaleDiscriminator
+from stylemelgan.discriminator import MultiScaleDiscriminator, MultiScaleSpecDiscriminator
 from stylemelgan.generator import MelganGenerator
 from matplotlib.figure import Figure
 import matplotlib as mpl
@@ -30,7 +30,7 @@ def plot_mel(mel: np.array) -> Figure:
 
 if __name__ == '__main__':
 
-    config = read_config('stylemelgan/configs/melgan_config_server.yaml')
+    config = read_config('stylemelgan/configs/melgan_config.yaml')
     audio = Audio.from_config(config)
     train_data_path = Path(config['paths']['train_dir'])
     val_data_path = Path(config['paths']['val_dir'])
@@ -42,18 +42,22 @@ if __name__ == '__main__':
 
     g_model = MelganGenerator(audio.n_mels).to(device)
     d_model = MultiScaleDiscriminator().to(device)
+    d_spec_model = MultiScaleSpecDiscriminator().to(device)
     train_cfg = config['training']
     g_optim = torch.optim.Adam(g_model.parameters(), lr=train_cfg['g_lr'], betas=(0.5, 0.9))
     d_optim = torch.optim.Adam(d_model.parameters(), lr=train_cfg['d_lr'], betas=(0.5, 0.9))
+    d_spec_optim = torch.optim.Adam(d_spec_model.parameters(), lr=train_cfg['d_lr'], betas=(0.5, 0.9))
 
     multires_stft_loss = MultiResStftLoss().to(device)
 
     try:
-        checkpoint = torch.load('checkpoints/latest_model_nostft.pt', map_location=device)
+        checkpoint = torch.load('checkpoints/latest_model_neurips_specdisc_nostft.pt', map_location=device)
         g_model.load_state_dict(checkpoint['g_model'])
         g_optim.load_state_dict(checkpoint['g_optim'])
         d_model.load_state_dict(checkpoint['d_model'])
         d_optim.load_state_dict(checkpoint['d_optim'])
+        d_spec_model.load_state_dict(checkpoint['d_spec_model'])
+        d_spec_optim.load_state_dict(checkpoint['d_spec_optim'])
         step = checkpoint['step']
     except Exception as e:
         print(e)
@@ -65,7 +69,7 @@ if __name__ == '__main__':
 
     pretraining_steps = 0
 
-    summary_writer = SummaryWriter(log_dir='checkpoints/logs_nostft')
+    summary_writer = SummaryWriter(log_dir='checkpoints/logs_neurips_specdisc_nostft')
 
     best_stft = 9999
 
@@ -79,30 +83,53 @@ if __name__ == '__main__':
             wav_fake = g_model(mel)[:, :, :16000]
 
             d_loss = 0.0
+            d_spec_loss = 0.0
             g_loss = 0.0
             stft_norm_loss = 0.0
             stft_spec_loss = 0.0
 
+            d_loss_all = 0
+
             if step > pretraining_steps:
+
                 # discriminator
                 d_fake = d_model(wav_fake.detach())
-                d_real = d_model(wav_real)
+                d_real = d_model(wav_real.detach())
                 for (_, score_fake), (_, score_real) in zip(d_fake, d_real):
-                    d_loss += torch.mean(torch.sum(torch.pow(score_real - 1.0, 2), dim=[1, 2]))
-                    d_loss += torch.mean(torch.sum(torch.pow(score_fake, 2), dim=[1, 2]))
+                    d_loss += F.relu(1.0 - score_real).mean()
+                    d_loss += F.relu(1.0 + score_fake).mean()
+
+                # spec discriminator
+                d_spec_fake = d_spec_model(wav_fake.detach())
+                d_spec_real = d_spec_model(wav_real.detach())
+                for (_, score_fake), (_, score_real) in zip(d_fake, d_real):
+                    d_spec_loss += F.relu(1.0 - score_real).mean()
+                    d_spec_loss += F.relu(1.0 + score_fake).mean()
+
+                d_loss_all = d_loss + d_spec_loss
+
                 d_optim.zero_grad()
-                d_loss.backward()
+                d_spec_optim.zero_grad()
+                d_loss_all.backward()
                 d_optim.step()
+                d_spec_optim.step()
 
                 # generator
                 d_fake = d_model(wav_fake)
                 for (feat_fake, score_fake), (feat_real, _) in zip(d_fake, d_real):
-                    g_loss += torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
+                    g_loss += -score_fake.mean()
                     for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
-                        g_loss += 10. * torch.mean(torch.abs(feat_fake_i - feat_real_i.detach()))
+                        g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
+
+                # generator
+                d_spec_fake = d_spec_model(wav_fake)
+                for (feat_fake, score_fake), (feat_real, _) in zip(d_spec_fake, d_spec_real):
+                    g_loss += -score_fake.mean()
+                    for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
+                        g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
-            g_loss_all = g_loss #+ stft_norm_loss + stft_spec_loss
+            g_loss_all = g_loss # + stft_norm_loss + stft_spec_loss
 
             g_optim.zero_grad()
             g_loss_all.backward()
@@ -118,6 +145,7 @@ if __name__ == '__main__':
             summary_writer.add_scalar('stft_norm_loss', stft_norm_loss, global_step=step)
             summary_writer.add_scalar('stft_spec_loss', stft_spec_loss, global_step=step)
             summary_writer.add_scalar('discriminator_loss', d_loss, global_step=step)
+            summary_writer.add_scalar('spec_discriminator_loss', d_spec_loss, global_step=step)
 
             if step % 10000 == 0:
                 g_model.eval()
@@ -154,7 +182,7 @@ if __name__ == '__main__':
                         'd_optim': d_optim.state_dict(),
                         'config': config,
                         'step': step
-                    }, 'checkpoints/best_model_nostft.pt')
+                    }, 'checkpoints/best_model_neurips_specdisc_nostft.pt')
                     summary_writer.add_audio('best_generated', wav_fake, sample_rate=audio.sample_rate, global_step=step)
 
                 g_model.train()
@@ -175,4 +203,4 @@ if __name__ == '__main__':
             'd_optim': d_optim.state_dict(),
             'config': config,
             'step': step
-        }, 'checkpoints/latest_model_nostft.pt')
+        }, 'checkpoints/latest_model_neurips_specdisc_nostft.pt')
