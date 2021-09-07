@@ -180,6 +180,8 @@ if __name__ == '__main__':
                         'g_optim': g_optim.state_dict(),
                         'd_model': d_model.state_dict(),
                         'd_optim': d_optim.state_dict(),
+                        'd_spec_model': d_spec_model.state_dict(),
+                        'd_spec_optim': d_spec_optim.state_dict(),
                         'config': config,
                         'step': step
                     }, 'checkpoints/best_model_neurips_specdisc_nostft.pt')
@@ -201,6 +203,8 @@ if __name__ == '__main__':
             'g_optim': g_optim.state_dict(),
             'd_model': d_model.state_dict(),
             'd_optim': d_optim.state_dict(),
+            'd_spec_model': d_spec_model.state_dict(),
+            'd_spec_optim': d_spec_optim.state_dict(),
             'config': config,
             'step': step
         }, 'checkpoints/latest_model_neurips_specdisc_nostft.pt')
