@@ -4,6 +4,7 @@ from multiprocessing.pool import Pool
 from pathlib import Path
 
 import torch
+import tqdm
 
 from stylemelgan.audio import Audio
 from stylemelgan.utils import read_config
@@ -49,7 +50,7 @@ if __name__ == '__main__':
 
     pool = Pool(processes=n_workers)
 
-    for i in enumerate(pool.imap_unordered(preprocessor, all_files)):
+    for _ in tqdm.tqdm(pool.imap_unordered(preprocessor, all_files)):
         pass
 
     print('Preprocessing done.')
