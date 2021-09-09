@@ -50,7 +50,7 @@ if __name__ == '__main__':
 
     pool = Pool(processes=n_workers)
 
-    for _ in tqdm.tqdm(pool.imap_unordered(preprocessor, all_files)):
+    for _ in tqdm.tqdm(pool.imap_unordered(preprocessor, all_files), total=len(all_files)):
         pass
 
     print('Preprocessing done.')
