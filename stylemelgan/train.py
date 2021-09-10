@@ -58,8 +58,8 @@ if __name__ == '__main__':
     except Exception as e:
         print(e)
 
-    dataloader = new_dataloader(data_path=train_data_path, segment_len=16000, hop_len=256, batch_size=16, num_workers=4)
-    val_dataset = AudioDataset(data_path=val_data_path, segment_len=None, hop_len=256)
+    dataloader = new_dataloader(data_path=train_data_path, segment_len=16000, hop_len=256, batch_size=16, num_workers=16, sample_rate=audio.sample_rate)
+    val_dataset = AudioDataset(data_path=val_data_path, segment_len=None, hop_len=256, sample_rate=audio.sample_rate)
 
     stft = partial(stft, n_fft=1024, hop_length=256, win_length=1024)
 
