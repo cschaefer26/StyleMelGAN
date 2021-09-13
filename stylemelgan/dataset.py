@@ -1,69 +1,84 @@
-import random
-from pathlib import Path
-from typing import Dict, Union
+# copied from https://github.com/descriptinc/melgan-neurips/blob/master/mel2wav/dataset.py
+from typing import Union
 
-import librosa
 import torch
-from torch.utils.data import Dataset, DataLoader
+import torch.utils.data
+import torch.nn.functional as F
+
+from librosa.core import load
+from librosa.util import normalize
+
+from pathlib import Path
+import numpy as np
+import random
+
+from torch.utils.data import DataLoader
 
 
-class AudioDataset(Dataset):
+def files_to_list(filename):
+    """
+    Takes a text file of filenames and makes a list of filenames
+    """
+    with open(filename, encoding="utf-8") as f:
+        files = f.readlines()
+
+    files = [f.rstrip() for f in files]
+    return files
+
+
+class AudioDataset(torch.utils.data.Dataset):
+    """
+    This is the main class that calculates the spectrogram and returns the
+    spectrogram, audio pair.
+    """
 
     def __init__(self,
                  data_path: Path,
-                 hop_len: int,
-                 segment_len: Union[int, None],
                  sample_rate: int,
-                 padding_val: float = -11.5129) -> None:
-        mel_names = list(data_path.glob('**/*.mel'))
-        self.data_path = data_path
-        self.hop_len = hop_len
-        self.segment_len = segment_len
-        self.padding_val = padding_val
+                 segment_len: Union[int, None],
+                 augment: bool = True):
+        self.audio_files = list(data_path.glob('**/*.wav'))
         self.sample_rate = sample_rate
-        self.file_ids = [n.stem for n in mel_names]
-        if segment_len is not None:
-            self.mel_segment_len = segment_len // hop_len + 2
+        self.segment_length = segment_len
+        self.augment = augment
 
-    def __len__(self):
-        return len(self.file_ids)
+    def __getitem__(self, index: int) -> torch.Tensor:
+        filename = self.audio_files[index]
+        audio = self._load_wav_to_torch(filename)
+        if self.segment_length is None:
+            return audio.unsqueeze(0).data
+        else:
+            if audio.size(0) >= self.segment_length:
+                max_audio_start = audio.size(0) - self.segment_length
+                audio_start = random.randint(0, max_audio_start)
+                audio = audio[audio_start:audio_start + self.segment_length]
+            else:
+                audio = F.pad(
+                    audio, (0, self.segment_length - audio.size(0)), "constant"
+                ).data
+        return audio.unsqueeze(0)
 
-    def __getitem__(self, item_id: int) -> Dict[str, torch.Tensor]:
-        file_id = self.file_ids[item_id]
-        mel_path = self.data_path / f'{file_id}.mel'
-        wav_path = self.data_path / f'{file_id}.wav'
-        wav, _ = librosa.load(wav_path, sr=self.sample_rate)
-        wav = torch.tensor(wav).float()
-        mel = torch.load(mel_path).squeeze(0)
-        if self.segment_len is not None:
-            mel_pad_len = 2 * self.mel_segment_len - mel.size(-1)
-            if mel_pad_len > 0:
-                mel_pad = torch.full((mel.size(0), mel_pad_len), fill_value=self.padding_val)
-                mel = torch.cat([mel, mel_pad], dim=-1)
-            wav_pad_len = mel.size(-1) * self.hop_len - wav.size(0)
-            if wav_pad_len > 0:
-                wav_pad = torch.zeros((wav_pad_len, ))
-                wav = torch.cat([wav, wav_pad], dim=0)
-            max_mel_start = mel.size(-1) - self.mel_segment_len
-            mel_start = random.randint(0, max_mel_start)
-            mel_end = mel_start + self.mel_segment_len
-            mel = mel[:, mel_start:mel_end]
-            wav_start = mel_start * self.hop_len
-            wav_end = wav_start + self.segment_len
-            wav = wav[wav_start:wav_end]
-            wav = wav + (1 / 32768) * torch.randn_like(wav)
-        wav = wav.unsqueeze(0)
-        return {'mel': mel, 'wav': wav}
+    def __len__(self) -> int:
+        return len(self.audio_files)
+
+    def _load_wav_to_torch(self, full_path: Path) -> torch.Tensor:
+        data, sampling_rate = load(full_path, sr=self.sample_rate)
+        data = 0.95 * normalize(data)
+        if self.augment:
+            amplitude = np.random.uniform(low=0.3, high=1.0)
+            data = data * amplitude
+        return torch.from_numpy(data).float()
 
 
 def new_dataloader(data_path: Path,
-                   segment_len: int,
-                   hop_len: int,
-                   batch_size: int,
                    sample_rate: int,
+                   segment_len: int,
+                   batch_size: int,
+                   augment: bool,
                    num_workers: int = 0) -> DataLoader:
 
-    dataset = AudioDataset(data_path=data_path, segment_len=segment_len, hop_len=hop_len, sample_rate=sample_rate)
+    dataset = AudioDataset(data_path=data_path, sample_rate=sample_rate,
+                           segment_len=segment_len, augment=augment)
     dataloader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True,
                             num_workers=num_workers, pin_memory=True, drop_last=True)
     return dataloader
@@ -71,7 +86,6 @@ def new_dataloader(data_path: Path,
 
 if __name__ == '__main__':
     data_path = Path('/Users/cschaefe/datasets/asvoice2_splitted_train')
-    dataloader = new_dataloader(data_path=data_path, segment_len=16000, hop_len=256, batch_size=2)
+    dataloader = new_dataloader(data_path=data_path, sample_rate=22050, segment_len=16000, batch_size=2, augment=True)
     for item in dataloader:
-        print(item['mel'].size())
-        print(item['wav'].size())
+        print(item.size())

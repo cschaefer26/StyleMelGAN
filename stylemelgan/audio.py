@@ -3,60 +3,80 @@ import numpy as np
 import soundfile as sf
 from pathlib import Path
 from typing import Dict, Any, Union
+from librosa.filters import mel as librosa_mel_fn
+import torch.nn.functional as F
+import torch
+
+from stylemelgan.utils import read_config
 
 
-class Audio:
+def load_wav(path: Union[str, Path], sample_rate: int) -> np.array:
+    wav, _ = librosa.load(path, sr=sample_rate)
+    return wav
 
-    def __init__(self,
-                 n_mels: int,
-                 sample_rate: int,
-                 hop_length: int,
-                 win_length: int,
-                 n_fft: int,
-                 fmin: float,
-                 fmax: float) -> None:
 
-        self.n_mels = n_mels
-        self.sample_rate = sample_rate
+def save_wav(wav: np.array,
+             path: Union[str, Path],
+             sample_rate: int) -> None:
+    wav = wav.astype(np.float32)
+    sf.write(str(path), wav, samplerate=sample_rate)
+
+
+# from https://github.com/descriptinc/melgan-neurips/blob/master/mel2wav/modules.py
+class Audio2Mel(torch.nn.Module):
+
+    def __init__(
+        self,
+        n_fft: int,
+        hop_length: int,
+        win_length: int,
+        sample_rate: int,
+        n_mels: int,
+        fmin: float,
+        fmax: float
+    ):
+        super().__init__()
+        window = torch.hann_window(win_length).float()
+        mel_basis = librosa_mel_fn(
+            sr=sample_rate, n_fft=n_fft, n_mels=n_mels, fmin=fmin, fmax=fmax
+        )
+        mel_basis = torch.from_numpy(mel_basis).float()
+        self.register_buffer("mel_basis", mel_basis)
+        self.register_buffer("window", window)
+        self.n_fft = n_fft
         self.hop_length = hop_length
         self.win_length = win_length
-        self.n_fft = n_fft
-        self.fmin = fmin
-        self.fmax = fmax
+        self.sample_rate = sample_rate
+        self.n_mels = n_mels
 
-    @classmethod
-    def from_config(cls, config: Dict[str, Any]) -> 'Audio':
-        return Audio(**config['audio'])
-
-    def load_wav(self, path: Union[str, Path]) -> np.array:
-        wav, _ = librosa.load(path, sr=self.sample_rate)
-        return wav
-
-    def save_wav(self, wav: np.array, path: Union[str, Path]) -> None:
-        wav = wav.astype(np.float32)
-        sf.write(str(path), wav, samplerate=self.sample_rate)
-
-    def wav_to_mel(self, y: np.array, normalize=True) -> np.array:
-        spec = librosa.stft(
-            y=y,
+    def forward(self, audio: torch.Tensor) -> torch.Tensor:
+        p = (self.n_fft - self.hop_length) // 2
+        audio = F.pad(audio, (p, p), "reflect").squeeze(1)
+        fft = torch.stft(
+            audio,
             n_fft=self.n_fft,
             hop_length=self.hop_length,
-            win_length=self.win_length)
-        spec = np.abs(spec)
-        mel = librosa.feature.melspectrogram(
-            S=spec,
-            sr=self.sample_rate,
-            n_fft=self.n_fft,
-            n_mels=self.n_mels,
-            fmin=self.fmin,
-            fmax=self.fmax)
-        if normalize:
-            mel = self.normalize(mel)
-        return mel
+            win_length=self.win_length,
+            window=self.window,
+            center=False,
+        )
+        real_part, imag_part = fft.unbind(-1)
+        magnitude = torch.sqrt(real_part ** 2 + imag_part ** 2)
+        mel_output = torch.matmul(self.mel_basis, magnitude)
+        log_mel_spec = torch.log(torch.clamp(mel_output, min=1e-5))
+        return log_mel_spec
 
-    def normalize(self, mel: np.array) -> np.array:
-        mel = np.clip(mel, a_min=1.e-5, a_max=None)
-        return np.log(mel)
+    @classmethod
+    def from_config(cls, config: Dict[str, Any]) -> 'Audio2Mel':
+        return Audio2Mel(**config['audio'])
 
-    def denormalize(self, mel: np.array) -> np.array:
-        return np.exp(mel)
+
+if __name__ == '__main__':
+    cfg = read_config('configs/melgan_config.yaml')
+    audio2mel = Audio2Mel.from_config(cfg)
+
+    wav, _ = librosa.load('/Users/cschaefe/datasets/ASVoice4_incl_english/r_00001_snippets/206110025_001.wav', sr=22050)
+    mel = audio2mel(torch.from_numpy(wav).unsqueeze(0).unsqueeze(1))
+    torch.save(mel, '/Users/cschaefe/workspace/ForwardTacotron/model_outputs/0001.mel')
+
+
