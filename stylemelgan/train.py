@@ -60,7 +60,7 @@ if __name__ == '__main__':
         print(e)
 
     dataloader = new_dataloader(data_path=train_data_path, sample_rate=audio.sample_rate, segment_len=segment_len,
-                                batch_size=2, augment=True, num_workers=4)
+                                batch_size=16, augment=True, num_workers=4)
     val_dataset = AudioDataset(data_path=val_data_path, sample_rate=audio.sample_rate, segment_len=None,
                                augment=False)
 
