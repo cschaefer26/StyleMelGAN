@@ -29,7 +29,7 @@ def plot_mel(mel: np.array) -> Figure:
 
 if __name__ == '__main__':
 
-    config = read_config('stylemelgan/configs/melgan_config.yaml')
+    config = read_config('stylemelgan/configs/melgan_config_server.yaml')
     train_data_path = Path(config['paths']['train_dir'])
     val_data_path = Path(config['paths']['val_dir'])
 
