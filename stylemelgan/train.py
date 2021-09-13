@@ -29,7 +29,7 @@ def plot_mel(mel: np.array) -> Figure:
 
 if __name__ == '__main__':
 
-    config = read_config('stylemelgan/configs/melgan_config_server.yaml')
+    config = read_config('stylemelgan/configs/melgan_config.yaml')
     train_data_path = Path(config['paths']['train_dir'])
     val_data_path = Path(config['paths']['val_dir'])
 
@@ -75,6 +75,7 @@ if __name__ == '__main__':
     for epoch in range(10000):
         pbar = tqdm.tqdm(enumerate(dataloader, 1), total=len(dataloader))
         for i, wav_real in pbar:
+            wav_real = wav_real.to(device)
             step += 1
 
             mel = audio(wav_real)
@@ -130,6 +131,7 @@ if __name__ == '__main__':
                 val_wavs = []
 
                 for i, wav_real in enumerate(val_dataset):
+                    wav_real = wav_real.to(device)
                     val_mel = audio(wav_real.unsqueeze(0))
                     wav_fake = g_model.inference(val_mel, pad_steps=80).unsqueeze(0)
                     val_wavs.append((wav_fake, wav_real))
