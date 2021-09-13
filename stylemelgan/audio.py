@@ -58,7 +58,7 @@ class Audio2Mel(torch.nn.Module):
             win_length=self.win_length,
             center=False,
         )
-        mel_output = torch.matmul(self.mel_basis, fft)
+        mel_output = torch.matmul(self.mel_basis.to(fft.device), fft)
         log_mel_spec = torch.log(torch.clamp(mel_output, min=1e-5))
         return log_mel_spec
 
