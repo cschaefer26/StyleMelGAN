@@ -1,7 +1,6 @@
 from pathlib import Path
 import tqdm
 import torch
-import soundfile as sf
 from torch.cuda import is_available
 import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
@@ -61,7 +60,7 @@ if __name__ == '__main__':
         print(e)
 
     dataloader = new_dataloader(data_path=train_data_path, sample_rate=audio.sample_rate, segment_len=segment_len,
-                                batch_size=16, augment=True, num_workers=4)
+                                batch_size=2, augment=True, num_workers=4)
     val_dataset = AudioDataset(data_path=val_data_path, sample_rate=audio.sample_rate, segment_len=None,
                                augment=False)
 
@@ -124,7 +123,7 @@ if __name__ == '__main__':
             summary_writer.add_scalar('stft_spec_loss', stft_spec_loss, global_step=step)
             summary_writer.add_scalar('discriminator_loss', d_loss, global_step=step)
 
-            if step % 1 == 0:
+            if step % 10000 == 0:
                 g_model.eval()
                 val_norm_loss = 0
                 val_spec_loss = 0
@@ -132,13 +131,10 @@ if __name__ == '__main__':
 
                 for i, wav_real in enumerate(val_dataset):
                     val_mel = audio(wav_real.unsqueeze(0))
-                    wav_fake = g_model.inference(val_mel, pad_steps=80).squeeze().cpu().numpy()
-                    wav_real = wav_real.detach().squeeze().cpu().numpy()
-                    wav_f = torch.tensor(wav_fake).unsqueeze(0).to(device)
-                    wav_r = torch.tensor(wav_real).unsqueeze(0).to(device)
+                    wav_fake = g_model.inference(val_mel, pad_steps=80).unsqueeze(0)
                     val_wavs.append((wav_fake, wav_real))
-                    size = min(wav_r.size(-1), wav_f.size(-1))
-                    val_n, val_s = multires_stft_loss(wav_f[..., :size], wav_r[..., :size])
+                    size = min(wav_real.size(-1), wav_fake.size(-1))
+                    val_n, val_s = multires_stft_loss(wav_fake[..., :size], wav_real[..., :size])
                     val_norm_loss += val_n
                     val_spec_loss += val_s
 
@@ -146,7 +142,7 @@ if __name__ == '__main__':
                 val_spec_loss /= len(val_dataset)
                 summary_writer.add_scalar('val_stft_norm_loss', val_norm_loss, global_step=step)
                 summary_writer.add_scalar('val_stft_spec_loss', val_spec_loss, global_step=step)
-                val_wavs.sort(key=lambda x: x[1].shape[0])
+                val_wavs.sort(key=lambda x: x[1].size(-1))
                 wav_fake, wav_real = val_wavs[-1]
                 if val_norm_loss + val_spec_loss < best_stft:
                     best_stft = val_norm_loss + val_spec_loss
@@ -159,15 +155,16 @@ if __name__ == '__main__':
                         'config': config,
                         'step': step
                     }, 'checkpoints/best_model_neurips_orig_nostft.pt')
-                    summary_writer.add_audio('best_generated', wav_fake, sample_rate=audio.sample_rate, global_step=step)
+                    summary_writer.add_audio('best_generated', wav_fake.squeeze().detach().cpu(),
+                                             sample_rate=audio.sample_rate, global_step=step)
 
                 g_model.train()
                 summary_writer.add_audio('generated', wav_fake, sample_rate=audio.sample_rate, global_step=step)
                 summary_writer.add_audio('target', wav_real, sample_rate=audio.sample_rate, global_step=step)
-                mel_fake = audio.wav_to_mel(wav_fake)
-                mel_real = audio.wav_to_mel(wav_real)
-                mel_fake_plot = plot_mel(mel_fake)
-                mel_real_plot = plot_mel(mel_real)
+                mel_fake = audio(wav_fake.unsqueeze(1))
+                mel_real = audio(wav_real.unsqueeze(1))
+                mel_fake_plot = plot_mel(mel_fake.detach().cpu().squeeze().numpy())
+                mel_real_plot = plot_mel(mel_real.detach().cpu().squeeze().numpy())
                 summary_writer.add_figure('mel_generated', mel_fake_plot, global_step=step)
                 summary_writer.add_figure('mel_target', mel_real_plot, global_step=step)
 
