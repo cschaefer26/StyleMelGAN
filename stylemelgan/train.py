@@ -30,7 +30,7 @@ def plot_mel(mel: np.array) -> Figure:
 
 if __name__ == '__main__':
 
-    config = read_config('stylemelgan/configs/melgan_config.yaml')
+    config = read_config('stylemelgan/configs/melgan_config_server.yaml')
     audio = Audio.from_config(config)
     train_data_path = Path(config['paths']['train_dir'])
     val_data_path = Path(config['paths']['val_dir'])
@@ -165,7 +165,7 @@ if __name__ == '__main__':
                         'd_optim': d_optim.state_dict(),
                         'config': config,
                         'step': step
-                    }, 'checkpoints/best_model_neurips_16_nostft.pt')
+                    }, 'checkpoints/best_model_neurips_convdisc_nostft.pt')
                     summary_writer.add_audio('best_generated', wav_fake, sample_rate=audio.sample_rate, global_step=step)
 
                 g_model.train()
@@ -186,4 +186,4 @@ if __name__ == '__main__':
             'd_optim': d_optim.state_dict(),
             'config': config,
             'step': step
-        }, 'checkpoints/latest_model_neurips_16_nostft.pt')
+        }, 'checkpoints/latest_model_neurips_convdisc_nostft.pt')
