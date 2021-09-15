@@ -65,7 +65,11 @@ class MultiScaleDiscriminator(nn.Module):
 
         self.pooling = nn.ModuleList(
             [Identity()] +
-            [nn.AvgPool1d(kernel_size=4, stride=2, padding=1, count_include_pad=False) for _ in range(1, 3)]
+            [
+               nn.Sequential(nn.Conv1d(1, 32, kernel_size=7, stride=2, padding=3),
+                             nn.Conv1d(32, 1, kernel_size=1, stride=1))
+                for _ in range(1, 3)
+            ]
         )
 
     def forward(self, x):

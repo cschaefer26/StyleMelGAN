@@ -30,7 +30,7 @@ def plot_mel(mel: np.array) -> Figure:
 
 if __name__ == '__main__':
 
-    config = read_config('stylemelgan/configs/melgan_config_server_16.yaml')
+    config = read_config('stylemelgan/configs/melgan_config.yaml')
     audio = Audio.from_config(config)
     train_data_path = Path(config['paths']['train_dir'])
     val_data_path = Path(config['paths']['val_dir'])
@@ -49,7 +49,7 @@ if __name__ == '__main__':
     multires_stft_loss = MultiResStftLoss().to(device)
 
     try:
-        checkpoint = torch.load('checkpoints/latest_model_neurips_16_nostft.pt', map_location=device)
+        checkpoint = torch.load('checkpoints/latest_model_neurips_convdisc_nostft.pt', map_location=device)
         g_model.load_state_dict(checkpoint['g_model'])
         g_optim.load_state_dict(checkpoint['g_optim'])
         d_model.load_state_dict(checkpoint['d_model'])
@@ -65,7 +65,7 @@ if __name__ == '__main__':
 
     pretraining_steps = 100000
 
-    summary_writer = SummaryWriter(log_dir='checkpoints/logs_neurips_16_nostft')
+    summary_writer = SummaryWriter(log_dir='checkpoints/logs_neurips_convdisc_nostft')
 
     best_stft = 9999
 
@@ -83,6 +83,9 @@ if __name__ == '__main__':
             stft_norm_loss = 0.0
             stft_spec_loss = 0.0
 
+            g_disc_loss_dict = {}
+            g_feat_loss_dict = {}
+
             if step > pretraining_steps:
                 # discriminator
                 d_fake = d_model(wav_fake.detach())
@@ -96,10 +99,13 @@ if __name__ == '__main__':
 
                 # generator
                 d_fake = d_model(wav_fake)
-                for (feat_fake, score_fake), (feat_real, _) in zip(d_fake, d_real):
+                for index, ((feat_fake, score_fake), (feat_real, _)) in enumerate(zip(d_fake, d_real)):
                     g_loss += -score_fake.mean()
+                    g_disc_loss_dict[index] = -score_fake.mean().item()
+                    g_feat_loss_dict[index] = 0
                     for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
                         g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
+                        g_feat_loss_dict[index] += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach()).item()
 
             factor = 1. if step < pretraining_steps else 0.
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
@@ -119,6 +125,10 @@ if __name__ == '__main__':
             summary_writer.add_scalar('stft_norm_loss', stft_norm_loss, global_step=step)
             summary_writer.add_scalar('stft_spec_loss', stft_spec_loss, global_step=step)
             summary_writer.add_scalar('discriminator_loss', d_loss, global_step=step)
+            for index, val in g_disc_loss_dict.items():
+                summary_writer.add_scalar(f'generator_loss_{index}', val, global_step=step)
+            for index, val in g_feat_loss_dict.items():
+                summary_writer.add_scalar(f'generator_feat_loss_{index}', val, global_step=step)
 
             if step % 10000 == 0:
                 g_model.eval()
