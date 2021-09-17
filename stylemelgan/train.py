@@ -63,7 +63,7 @@ if __name__ == '__main__':
 
     stft = partial(stft, n_fft=1024, hop_length=256, win_length=1024)
 
-    pretraining_steps = 100000
+    pretraining_steps = 0
 
     summary_writer = SummaryWriter(log_dir='checkpoints/logs_neurips_fnet')
 
