@@ -122,7 +122,8 @@ class Discriminator(nn.Module):
                 WNConv1d(1024, 1024, kernel_size=5, stride=1, padding=2),
                 LeakyReLU(relu_slope, inplace=True)
             ),
-            FNet(dim=1024, depth=4, mlp_dim=512)
+            FNet(dim=1024, depth=4, mlp_dim=512),
+            WNConv1d(1024, 1, kernel_size=3, stride=1, padding=1)
         ])
 
     def forward(self, x):
