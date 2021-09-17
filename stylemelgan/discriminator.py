@@ -99,22 +99,30 @@ class Discriminator(nn.Module):
 
         self.discriminator = nn.ModuleList([
             Sequential(
-                WNConv1d(1, 128, kernel_size=3),
-                LeakyReLU(relu_slope, inplace=True),
-                PositionalEncoding(128),
-                FNet(dim=128, depth=4, mlp_dim=256)
+                WNConv1d(1, 16, kernel_size=15, stride=1, padding=7, padding_mode='reflect'),
+                LeakyReLU(relu_slope, inplace=True)
             ),
             Sequential(
-                WNConv1d(128, 256, kernel_size=41, stride=4, padding=20, groups=4),
-                PositionalEncoding(256),
-                FNet(dim=256, depth=4, mlp_dim=512)
+                WNConv1d(16, 64, kernel_size=41, stride=4, padding=20, groups=4),
+                LeakyReLU(relu_slope, inplace=True)
             ),
             Sequential(
-                WNConv1d(256, 512, kernel_size=41, stride=4, padding=20, groups=4),
-                PositionalEncoding(512),
-                FNet(dim=512, depth=4, mlp_dim=512)
+                WNConv1d(64, 256, kernel_size=41, stride=4, padding=20, groups=16),
+                LeakyReLU(relu_slope, inplace=True)
             ),
-            WNConv1d(512, 1, kernel_size=3, stride=1, padding=1)
+            Sequential(
+                WNConv1d(256, 1024, kernel_size=41, stride=4, padding=20, groups=64),
+                LeakyReLU(relu_slope, inplace=True)
+            ),
+            Sequential(
+                WNConv1d(1024, 1024, kernel_size=41, stride=4, padding=20, groups=256),
+                LeakyReLU(relu_slope, inplace=True)
+            ),
+            Sequential(
+                WNConv1d(1024, 1024, kernel_size=5, stride=1, padding=2),
+                LeakyReLU(relu_slope, inplace=True)
+            ),
+            FNet(dim=1024, depth=4, mlp_dim=512)
         ])
 
     def forward(self, x):
