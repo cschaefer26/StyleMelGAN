@@ -1,0 +1,23 @@
+model_type: 'melgan'
+
+paths:
+  train_dir: '/home/sysgen/chris/data/bild_voice_splitted_train'
+  val_dir: '/home/sysgen/chris/data/bild_voice_splitted_val'
+  checkpoints: 'stylemelgan/checkpoints'
+
+audio:
+  sample_rate: 22050
+  n_mels: 80
+  n_fft: 1024
+  win_length: 1024
+  hop_length: 256
+  fmin: 0
+  fmax: 8000
+
+training:
+  batch_size: 16
+  segment_len: 16000
+  g_lr: 0.0001
+  d_lr: 0.0001
+  stft_spec_loss_weight: 1.
+  stft_norm_loss_weight: 1.

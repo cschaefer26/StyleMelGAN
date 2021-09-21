@@ -30,7 +30,7 @@ def plot_mel(mel: np.array) -> Figure:
 
 if __name__ == '__main__':
 
-    config = read_config('stylemelgan/configs/melgan_config_server_16.yaml')
+    config = read_config('stylemelgan/configs/melgan_config_server_bild.yaml')
     audio = Audio.from_config(config)
     train_data_path = Path(config['paths']['train_dir'])
     val_data_path = Path(config['paths']['val_dir'])
@@ -49,7 +49,7 @@ if __name__ == '__main__':
     multires_stft_loss = MultiResStftLoss().to(device)
 
     try:
-        checkpoint = torch.load('checkpoints/latest_model_neurips_16_nostft.pt', map_location=device)
+        checkpoint = torch.load('checkpoints/latest_model_bild_neurips_nostft.pt', map_location=device)
         g_model.load_state_dict(checkpoint['g_model'])
         g_optim.load_state_dict(checkpoint['g_optim'])
         d_model.load_state_dict(checkpoint['d_model'])
@@ -65,7 +65,7 @@ if __name__ == '__main__':
 
     pretraining_steps = 100000
 
-    summary_writer = SummaryWriter(log_dir='checkpoints/logs_neurips_16_nostft')
+    summary_writer = SummaryWriter(log_dir='checkpoints/logs_bild_neurips_nostft')
 
     best_stft = 9999
 
@@ -155,7 +155,7 @@ if __name__ == '__main__':
                         'd_optim': d_optim.state_dict(),
                         'config': config,
                         'step': step
-                    }, 'checkpoints/best_model_neurips_16_nostft.pt')
+                    }, 'checkpoints/best_model_bild_neurips_nostft.pt')
                     summary_writer.add_audio('best_generated', wav_fake, sample_rate=audio.sample_rate, global_step=step)
 
                 g_model.train()
@@ -176,4 +176,4 @@ if __name__ == '__main__':
             'd_optim': d_optim.state_dict(),
             'config': config,
             'step': step
-        }, 'checkpoints/latest_model_neurips_16_nostft.pt')
+        }, 'checkpoints/latest_model_bild_neurips_nostft.pt')
