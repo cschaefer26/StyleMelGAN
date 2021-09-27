@@ -108,6 +108,14 @@ class MelganGenerator(Module):
         return MelganGenerator(mel_channels=config['audio']['n_mels'],
                                **config['model'])
 
+    @classmethod
+    def from_checkpoint(cls, file: str) -> 'MelganGenerator':
+        checkpoint = torch.load(file, map_location=torch.device('cpu'))
+        config = checkpoint['config']
+        model = MelganGenerator.from_config(config)
+        model.load_state_dict(config['g_model'])
+        return model
+
 
 if __name__ == '__main__':
 

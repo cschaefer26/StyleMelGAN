@@ -15,8 +15,7 @@ if __name__ == '__main__':
 
     checkpoint = torch.load(args.checkpoint, map_location=torch.device('cpu'))
     step = checkpoint['step']
-    g_model = MelganGenerator(80)
-    g_model.load_state_dict(checkpoint['g_model'])
+    g_model = MelganGenerator.from_config(checkpoint['config'])
     g_model.eval()
     remove_weight_norm_recursively(g_model)
     audio = Audio.from_config(checkpoint['config'])
