@@ -4,7 +4,7 @@ import torch
 import argparse
 
 from stylemelgan.audio import Audio
-from stylemelgan.generator import MelganGenerator
+from stylemelgan.generator.melgan import MelganGenerator
 from stylemelgan.utils import remove_weight_norm_recursively
 
 if __name__ == '__main__':

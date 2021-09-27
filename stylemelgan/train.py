@@ -1,6 +1,6 @@
 from functools import partial
 from pathlib import Path
-
+import argparse
 import matplotlib as mpl
 import torch
 import torch.nn.functional as F
@@ -29,8 +29,12 @@ def plot_mel(mel: np.array) -> Figure:
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--config', type=str,
+                        default='stylemelgan/configs/melgan_config.yaml', help='points to config.yaml')
+    args = parser.parse_args()
 
-    config = read_config('stylemelgan/configs/melgan_config_server_bild.yaml')
+    config = read_config(args.config)
     model_name = config['model_name']
     audio = Audio.from_config(config)
     train_data_path = Path(config['paths']['train_dir'])
@@ -56,8 +60,9 @@ if __name__ == '__main__':
         d_model.load_state_dict(checkpoint['d_model'])
         d_optim.load_state_dict(checkpoint['d_optim'])
         step = checkpoint['step']
+        print(f'Loaded model with step {step}')
     except Exception as e:
-        print(e)
+        'Initializing model from scratch.'
 
     train_cfg = config['training']
     dataloader = new_dataloader(data_path=train_data_path, segment_len=train_cfg['segment_len'],
