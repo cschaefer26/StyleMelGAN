@@ -30,7 +30,7 @@ def plot_mel(mel: np.array) -> Figure:
 
 if __name__ == '__main__':
 
-    config = read_config('stylemelgan/configs/melgan_config_server.yaml')
+    config = read_config('stylemelgan/configs/melgan_config_server_bild.yaml')
     audio = Audio.from_config(config)
     train_data_path = Path(config['paths']['train_dir'])
     val_data_path = Path(config['paths']['val_dir'])
@@ -49,7 +49,7 @@ if __name__ == '__main__':
     multires_stft_loss = MultiResStftLoss().to(device)
 
     try:
-        checkpoint = torch.load('checkpoints/latest_model.pt', map_location=device)
+        checkpoint = torch.load('checkpoints/latest_model_bild_neurips_nostft.pt', map_location=device)
         g_model.load_state_dict(checkpoint['g_model'])
         g_optim.load_state_dict(checkpoint['g_optim'])
         d_model.load_state_dict(checkpoint['d_model'])
@@ -58,15 +58,18 @@ if __name__ == '__main__':
     except Exception as e:
         print(e)
 
-    dataloader = new_dataloader(data_path=train_data_path, segment_len=16000, hop_len=256, batch_size=16)
-    val_dataset = AudioDataset(data_path=val_data_path, segment_len=None, hop_len=256)
+    dataloader = new_dataloader(data_path=train_data_path, segment_len=16000, hop_len=256, batch_size=16, num_workers=16, sample_rate=audio.sample_rate)
+    val_dataset = AudioDataset(data_path=val_data_path, segment_len=None, hop_len=256, sample_rate=audio.sample_rate)
 
     stft = partial(stft, n_fft=1024, hop_length=256, win_length=1024)
 
-    pretraining_steps = 10000
+    pretraining_steps = 100000
 
-    summary_writer = SummaryWriter(log_dir='checkpoints/logs')
-    for epoch in range(100):
+    summary_writer = SummaryWriter(log_dir='checkpoints/logs_bild_neurips_nostft')
+
+    best_stft = 9999
+
+    for epoch in range(10000):
         pbar = tqdm.tqdm(enumerate(dataloader, 1), total=len(dataloader))
         for i, data in pbar:
             step += 1
@@ -85,8 +88,8 @@ if __name__ == '__main__':
                 d_fake = d_model(wav_fake.detach())
                 d_real = d_model(wav_real)
                 for (_, score_fake), (_, score_real) in zip(d_fake, d_real):
-                    d_loss += torch.mean(torch.sum(torch.pow(score_real - 1.0, 2), dim=[1, 2]))
-                    d_loss += torch.mean(torch.sum(torch.pow(score_fake, 2), dim=[1, 2]))
+                    d_loss += F.relu(1.0 - score_real).mean()
+                    d_loss += F.relu(1.0 + score_fake).mean()
                 d_optim.zero_grad()
                 d_loss.backward()
                 d_optim.step()
@@ -94,12 +97,13 @@ if __name__ == '__main__':
                 # generator
                 d_fake = d_model(wav_fake)
                 for (feat_fake, score_fake), (feat_real, _) in zip(d_fake, d_real):
-                    g_loss += torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
+                    g_loss += -score_fake.mean()
                     for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
-                        g_loss += 10. * torch.mean(torch.abs(feat_fake_i - feat_real_i.detach()))
+                        g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
+            factor = 1. if step < pretraining_steps else 0.
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
-            g_loss_all = g_loss + stft_norm_loss + stft_spec_loss
+            g_loss_all = g_loss + factor * (stft_norm_loss + stft_spec_loss)
 
             g_optim.zero_grad()
             g_loss_all.backward()
@@ -116,12 +120,44 @@ if __name__ == '__main__':
             summary_writer.add_scalar('stft_spec_loss', stft_spec_loss, global_step=step)
             summary_writer.add_scalar('discriminator_loss', d_loss, global_step=step)
 
-            if step % 1000 == 1:
+            if step % 10000 == 0:
                 g_model.eval()
-                val_mel = val_dataset[0]['mel'].to(device)
-                val_mel = val_mel.unsqueeze(0)
-                wav_fake = g_model.inference(val_mel).squeeze().cpu().numpy()
-                wav_real = val_dataset[0]['wav'].detach().squeeze().cpu().numpy()
+                val_norm_loss = 0
+                val_spec_loss = 0
+                val_wavs = []
+
+                for i, val_data in enumerate(val_dataset):
+                    val_mel = val_data['mel'].to(device)
+                    val_mel = val_mel.unsqueeze(0)
+                    wav_fake = g_model.inference(val_mel, pad_steps=80).squeeze().cpu().numpy()
+                    wav_real = val_data['wav'].detach().squeeze().cpu().numpy()
+                    wav_f = torch.tensor(wav_fake).unsqueeze(0).to(device)
+                    wav_r = torch.tensor(wav_real).unsqueeze(0).to(device)
+                    val_wavs.append((wav_fake, wav_real))
+                    size = min(wav_r.size(-1), wav_f.size(-1))
+                    val_n, val_s = multires_stft_loss(wav_f[..., :size], wav_r[..., :size])
+                    val_norm_loss += val_n
+                    val_spec_loss += val_s
+
+                val_norm_loss /= len(val_dataset)
+                val_spec_loss /= len(val_dataset)
+                summary_writer.add_scalar('val_stft_norm_loss', val_norm_loss, global_step=step)
+                summary_writer.add_scalar('val_stft_spec_loss', val_spec_loss, global_step=step)
+                val_wavs.sort(key=lambda x: x[1].shape[0])
+                wav_fake, wav_real = val_wavs[-1]
+                if val_norm_loss + val_spec_loss < best_stft:
+                    best_stft = val_norm_loss + val_spec_loss
+                    print(f'\nnew best stft: {best_stft}')
+                    torch.save({
+                        'g_model': g_model.state_dict(),
+                        'g_optim': g_optim.state_dict(),
+                        'd_model': d_model.state_dict(),
+                        'd_optim': d_optim.state_dict(),
+                        'config': config,
+                        'step': step
+                    }, 'checkpoints/best_model_bild_neurips_nostft.pt')
+                    summary_writer.add_audio('best_generated', wav_fake, sample_rate=audio.sample_rate, global_step=step)
+
                 g_model.train()
                 summary_writer.add_audio('generated', wav_fake, sample_rate=audio.sample_rate, global_step=step)
                 summary_writer.add_audio('target', wav_real, sample_rate=audio.sample_rate, global_step=step)
@@ -140,4 +176,4 @@ if __name__ == '__main__':
             'd_optim': d_optim.state_dict(),
             'config': config,
             'step': step
-        }, 'checkpoints/latest_model.pt')
+        }, 'checkpoints/latest_model_bild_neurips_nostft.pt')
