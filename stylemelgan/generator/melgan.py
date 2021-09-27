@@ -1,9 +1,10 @@
-from typing import Tuple
+from typing import Tuple, Dict, Any
 
 import torch
 from torch.nn import Module, ModuleList, Sequential, LeakyReLU, Tanh
 
 from stylemelgan.common import WNConv1d, WNConvTranspose1d
+from stylemelgan.utils import read_config
 
 
 class ResBlock(Module):
@@ -102,10 +103,16 @@ class MelganGenerator(Module):
             audio = audio[:-(self.hop_length * pad_steps)]
         return audio
 
+    @classmethod
+    def from_config(cls, config: Dict[str, Any]) -> 'MelganGenerator':
+        return MelganGenerator(mel_channels=config['audio']['n_mels'],
+                               **config['model'])
+
 
 if __name__ == '__main__':
-    model = MelganGenerator(80)
 
+    config = read_config('../stylemelgan/configs/melgan_config.yaml')
+    model = MelganGenerator.from_config(config)
     x = torch.randn(3, 80, 1000)
     print(x.shape)
 

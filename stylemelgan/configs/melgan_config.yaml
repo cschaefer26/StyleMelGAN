@@ -24,3 +24,9 @@ training:
   eval_steps: 10000
   epochs: 100000
   num_workers: 6
+
+model:
+  channels: [512, 256, 128, 64, 32]
+  res_layers: [5, 7, 8, 9]
+  relu_slope: 0.2
+  padding_val: -11.5129
