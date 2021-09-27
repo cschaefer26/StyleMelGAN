@@ -1,18 +1,18 @@
+from functools import partial
 from pathlib import Path
-import tqdm
+
+import matplotlib as mpl
 import torch
-import soundfile as sf
-from torch.cuda import is_available
 import torch.nn.functional as F
+import tqdm
+from matplotlib.figure import Figure
+from torch.cuda import is_available
 from torch.utils.tensorboard import SummaryWriter
 
 from stylemelgan.audio import Audio
 from stylemelgan.dataset import new_dataloader, AudioDataset
 from stylemelgan.discriminator import MultiScaleDiscriminator
-from stylemelgan.generator import MelganGenerator
-from matplotlib.figure import Figure
-import matplotlib as mpl
-from functools import partial
+from stylemelgan.generator.melgan import MelganGenerator
 from stylemelgan.losses import stft, MultiResStftLoss
 from stylemelgan.utils import read_config
 
@@ -31,6 +31,7 @@ def plot_mel(mel: np.array) -> Figure:
 if __name__ == '__main__':
 
     config = read_config('stylemelgan/configs/melgan_config_server_bild.yaml')
+    model_name = config['model_name']
     audio = Audio.from_config(config)
     train_data_path = Path(config['paths']['train_dir'])
     val_data_path = Path(config['paths']['val_dir'])
@@ -49,7 +50,7 @@ if __name__ == '__main__':
     multires_stft_loss = MultiResStftLoss().to(device)
 
     try:
-        checkpoint = torch.load('checkpoints/latest_model_bild_neurips_nostft.pt', map_location=device)
+        checkpoint = torch.load(f'checkpoints/latest_model__{model_name}.pt', map_location=device)
         g_model.load_state_dict(checkpoint['g_model'])
         g_optim.load_state_dict(checkpoint['g_optim'])
         d_model.load_state_dict(checkpoint['d_model'])
@@ -58,18 +59,22 @@ if __name__ == '__main__':
     except Exception as e:
         print(e)
 
-    dataloader = new_dataloader(data_path=train_data_path, segment_len=16000, hop_len=256, batch_size=16, num_workers=16, sample_rate=audio.sample_rate)
-    val_dataset = AudioDataset(data_path=val_data_path, segment_len=None, hop_len=256, sample_rate=audio.sample_rate)
+    train_cfg = config['training']
+    dataloader = new_dataloader(data_path=train_data_path, segment_len=train_cfg['segment_len'],
+                                hop_len=audio.hop_length, batch_size=train_cfg['batch_size'],
+                                num_workers=train_cfg['num_workers'], sample_rate=audio.sample_rate)
+    val_dataset = AudioDataset(data_path=val_data_path, segment_len=None, hop_len=audio.hop_length,
+                               sample_rate=audio.sample_rate)
 
     stft = partial(stft, n_fft=1024, hop_length=256, win_length=1024)
 
-    pretraining_steps = 100000
+    pretraining_steps = train_cfg['pretraining_steps']
 
-    summary_writer = SummaryWriter(log_dir='checkpoints/logs_bild_neurips_nostft')
+    summary_writer = SummaryWriter(log_dir=f'checkpoints/logs_{model_name}')
 
     best_stft = 9999
 
-    for epoch in range(10000):
+    for epoch in range(train_cfg['epochs']):
         pbar = tqdm.tqdm(enumerate(dataloader, 1), total=len(dataloader))
         for i, data in pbar:
             step += 1
@@ -120,7 +125,7 @@ if __name__ == '__main__':
             summary_writer.add_scalar('stft_spec_loss', stft_spec_loss, global_step=step)
             summary_writer.add_scalar('discriminator_loss', d_loss, global_step=step)
 
-            if step % 10000 == 0:
+            if step % train_cfg['eval_steps'] == 0:
                 g_model.eval()
                 val_norm_loss = 0
                 val_spec_loss = 0
@@ -155,7 +160,7 @@ if __name__ == '__main__':
                         'd_optim': d_optim.state_dict(),
                         'config': config,
                         'step': step
-                    }, 'checkpoints/best_model_bild_neurips_nostft.pt')
+                    }, f'checkpoints/best_model_{model_name}.pt')
                     summary_writer.add_audio('best_generated', wav_fake, sample_rate=audio.sample_rate, global_step=step)
 
                 g_model.train()
@@ -176,4 +181,4 @@ if __name__ == '__main__':
             'd_optim': d_optim.state_dict(),
             'config': config,
             'step': step
-        }, 'checkpoints/latest_model_bild_neurips_nostft.pt')
+        }, f'checkpoints/latest_model__{model_name}.pt')
