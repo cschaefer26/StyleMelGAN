@@ -9,7 +9,7 @@ from torch.utils.tensorboard import SummaryWriter
 from stylemelgan.audio import Audio
 from stylemelgan.dataset import new_dataloader, AudioDataset
 from stylemelgan.discriminator import MultiScaleDiscriminator
-from stylemelgan.generator import MelganGenerator
+from stylemelgan.generator import MelganGenerator, Autoencoder
 from matplotlib.figure import Figure
 import matplotlib as mpl
 from functools import partial
@@ -30,7 +30,7 @@ def plot_mel(mel: np.array) -> Figure:
 
 if __name__ == '__main__':
 
-    config = read_config('stylemelgan/configs/melgan_config_server_bild.yaml')
+    config = read_config('stylemelgan/configs/melgan_config.yaml')
     audio = Audio.from_config(config)
     train_data_path = Path(config['paths']['train_dir'])
     val_data_path = Path(config['paths']['val_dir'])
@@ -45,15 +45,18 @@ if __name__ == '__main__':
     train_cfg = config['training']
     g_optim = torch.optim.Adam(g_model.parameters(), lr=train_cfg['g_lr'], betas=(0.5, 0.9))
     d_optim = torch.optim.Adam(d_model.parameters(), lr=train_cfg['d_lr'], betas=(0.5, 0.9))
-
+    autoencoder = Autoencoder().to(device)
     multires_stft_loss = MultiResStftLoss().to(device)
+    auto_optim = torch.optim.Adam(autoencoder.parameters(), lr=1e-4, betas=(0.5, 0.9))
 
     try:
-        checkpoint = torch.load('checkpoints/latest_model_bild_neurips_nostft.pt', map_location=device)
+        checkpoint = torch.load('checkpoints/latest_model_neurips_nostft.pt', map_location=device)
         g_model.load_state_dict(checkpoint['g_model'])
         g_optim.load_state_dict(checkpoint['g_optim'])
         d_model.load_state_dict(checkpoint['d_model'])
         d_optim.load_state_dict(checkpoint['d_optim'])
+        #autoencoder.load_state_dict(checkpoint['auto_model'])
+        #auto_optim.load_state_dict(checkpoint['auto_optim'])
         step = checkpoint['step']
     except Exception as e:
         print(e)
@@ -74,6 +77,16 @@ if __name__ == '__main__':
         for i, data in pbar:
             step += 1
             mel = data['mel'].to(device)
+
+            mel_auto = autoencoder(mel)
+
+            auto_loss = F.l1_loss(mel, mel_auto)
+            auto_optim.zero_grad()
+            auto_loss.backward()
+            auto_optim.step()
+
+            mel = mel_auto.detach()
+
             wav_real = data['wav'].to(device)
 
             wav_fake = g_model(mel)[:, :, :16000]
@@ -119,8 +132,9 @@ if __name__ == '__main__':
             summary_writer.add_scalar('stft_norm_loss', stft_norm_loss, global_step=step)
             summary_writer.add_scalar('stft_spec_loss', stft_spec_loss, global_step=step)
             summary_writer.add_scalar('discriminator_loss', d_loss, global_step=step)
+            summary_writer.add_scalar('auto_loss', auto_loss, global_step=step)
 
-            if step % 10000 == 0:
+            if step % 1 == 0:
                 g_model.eval()
                 val_norm_loss = 0
                 val_spec_loss = 0
@@ -153,12 +167,13 @@ if __name__ == '__main__':
                         'g_optim': g_optim.state_dict(),
                         'd_model': d_model.state_dict(),
                         'd_optim': d_optim.state_dict(),
+                        'auto_model': autoencoder.state_dict(),
+                        'auto_optim': auto_optim.state_dict(),
                         'config': config,
                         'step': step
-                    }, 'checkpoints/best_model_bild_neurips_nostft.pt')
+                    }, 'checkpoints/best_model_neurips_nostft.pt')
                     summary_writer.add_audio('best_generated', wav_fake, sample_rate=audio.sample_rate, global_step=step)
 
-                g_model.train()
                 summary_writer.add_audio('generated', wav_fake, sample_rate=audio.sample_rate, global_step=step)
                 summary_writer.add_audio('target', wav_real, sample_rate=audio.sample_rate, global_step=step)
                 mel_fake = audio.wav_to_mel(wav_fake)
@@ -168,12 +183,45 @@ if __name__ == '__main__':
                 summary_writer.add_figure('mel_generated', mel_fake_plot, global_step=step)
                 summary_writer.add_figure('mel_target', mel_real_plot, global_step=step)
 
+                for i, val_data in enumerate(val_dataset):
+                    val_mel = val_data['mel'].to(device)
+                    val_mel = val_mel.unsqueeze(0)
+                    val_mel = autoencoder(val_mel).detach()
+                    wav_fake = g_model.inference(val_mel, pad_steps=80).squeeze().cpu().numpy()
+                    wav_real = val_data['wav'].detach().squeeze().cpu().numpy()
+                    wav_f = torch.tensor(wav_fake).unsqueeze(0).to(device)
+                    wav_r = torch.tensor(wav_real).unsqueeze(0).to(device)
+                    val_wavs.append((wav_fake, wav_real, val_mel))
+                    size = min(wav_r.size(-1), wav_f.size(-1))
+                    val_n, val_s = multires_stft_loss(wav_f[..., :size], wav_r[..., :size])
+                    val_norm_loss += val_n
+                    val_spec_loss += val_s
+
+                val_norm_loss /= len(val_dataset)
+                val_spec_loss /= len(val_dataset)
+                summary_writer.add_scalar('auto_val_stft_norm_loss', val_norm_loss, global_step=step)
+                summary_writer.add_scalar('auto_val_stft_spec_loss', val_spec_loss, global_step=step)
+                val_wavs.sort(key=lambda x: x[1].shape[0])
+                wav_fake, wav_real, val_mel = val_wavs[-1]
+                g_model.train()
+                summary_writer.add_audio('auto_generated', wav_fake, sample_rate=audio.sample_rate, global_step=step)
+                summary_writer.add_audio('auto_target', wav_real, sample_rate=audio.sample_rate, global_step=step)
+                mel_fake = audio.wav_to_mel(wav_fake)
+                mel_real = audio.wav_to_mel(wav_real)
+                mel_fake_plot = plot_mel(mel_fake)
+                mel_real_plot = plot_mel(mel_real)
+                summary_writer.add_figure('auto_mel_generated', mel_fake_plot, global_step=step)
+                summary_writer.add_figure('auto_mel_target', mel_real_plot, global_step=step)
+                summary_writer.add_figure('auto_mel', val_mel.squeeze().cpu().numpy(), global_step=step)
+
         # epoch end
         torch.save({
             'g_model': g_model.state_dict(),
             'g_optim': g_optim.state_dict(),
             'd_model': d_model.state_dict(),
             'd_optim': d_optim.state_dict(),
+            'auto_model': autoencoder.state_dict(),
+            'auto_optim': auto_optim.state_dict(),
             'config': config,
             'step': step
-        }, 'checkpoints/latest_model_bild_neurips_nostft.pt')
+        }, 'checkpoints/latest_model_neurips_nostft.pt')

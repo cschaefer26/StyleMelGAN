@@ -1,7 +1,7 @@
 from typing import Tuple
 
 import torch
-from torch.nn import Module, ModuleList, Sequential, LeakyReLU, Tanh
+from torch.nn import Module, ModuleList, Sequential, LeakyReLU, Tanh, Dropout
 
 from stylemelgan.common import WNConv1d, WNConvTranspose1d
 
@@ -50,6 +50,24 @@ class ResStack(Module):
         for res_block in self.res_blocks:
             x = res_block(x)
         return x
+
+
+class Autoencoder(Module):
+
+    def __init__(self, n_mels: int = 80) -> None:
+        super().__init__()
+        self.convs = Sequential(
+            WNConv1d(n_mels, 64, 3, padding=1),
+            LeakyReLU(0.2),
+            Dropout(0.5),
+            WNConv1d(64, 64, 3, padding=1),
+            LeakyReLU(0.2),
+            Dropout(0.5),
+            WNConv1d(64, n_mels, 3, padding=1),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.convs(x)
 
 
 class MelganGenerator(Module):
