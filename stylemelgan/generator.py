@@ -61,7 +61,7 @@ class Autoencoder(Module):
             LeakyReLU(0.2),
             Dropout(0.5),
             WNConv1d(256, 256, 5, padding=2),
-            Linear(256, n_mels)
+            WNConv1d(256, n_mels, 1),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
