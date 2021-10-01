@@ -61,6 +61,7 @@ class Autoencoder(Module):
             LeakyReLU(0.2),
             Dropout(0.5),
             WNConv1d(256, 256, 5, padding=2),
+            LeakyReLU(0.2),
             WNConv1d(256, n_mels, 1),
         )
 
