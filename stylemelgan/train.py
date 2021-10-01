@@ -134,7 +134,7 @@ if __name__ == '__main__':
             summary_writer.add_scalar('discriminator_loss', d_loss, global_step=step)
             summary_writer.add_scalar('auto_loss', auto_loss, global_step=step)
 
-            if step % 1000 == 0:
+            if step % 10000 == 0:
                 g_model.eval()
                 val_norm_loss = 0
                 val_spec_loss = 0
