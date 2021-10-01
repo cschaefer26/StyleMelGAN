@@ -72,7 +72,7 @@ if __name__ == '__main__':
 
     best_stft = 9999
 
-    for epoch in range(10000):
+    for epoch in range(1000):
         pbar = tqdm.tqdm(enumerate(dataloader, 1), total=len(dataloader))
         for i, data in pbar:
             step += 1
@@ -210,9 +210,10 @@ if __name__ == '__main__':
                 mel_real = audio.wav_to_mel(wav_real)
                 mel_fake_plot = plot_mel(mel_fake)
                 mel_real_plot = plot_mel(mel_real)
+                mel_auto_plot = plot_mel(val_mel.squeeze().cpu().numpy())
                 summary_writer.add_figure('auto_mel_generated', mel_fake_plot, global_step=step)
                 summary_writer.add_figure('auto_mel_target', mel_real_plot, global_step=step)
-                summary_writer.add_figure('auto_mel', val_mel.squeeze().cpu().numpy(), global_step=step)
+                summary_writer.add_figure('auto_mel', mel_auto_plot, global_step=step)
 
         # epoch end
         torch.save({
