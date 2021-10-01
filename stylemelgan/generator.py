@@ -57,13 +57,10 @@ class Autoencoder(Module):
     def __init__(self, n_mels: int = 80) -> None:
         super().__init__()
         self.convs = Sequential(
-            WNConv1d(n_mels, 128, 3, padding=1),
+            WNConv1d(n_mels, 256, 3, padding=1),
             LeakyReLU(0.2),
             Dropout(0.5),
-            WNConv1d(128, 128, 3, padding=1),
-            LeakyReLU(0.2),
-            Dropout(0.5),
-            WNConv1d(128, n_mels, 3, padding=1),
+            WNConv1d(256, n_mels, 3, padding=1),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
