@@ -57,11 +57,9 @@ class Autoencoder(Module):
     def __init__(self, n_mels: int = 80) -> None:
         super().__init__()
         self.convs = Sequential(
-            WNConv1d(n_mels, 256, 5, padding=2),
+            WNConv1d(n_mels, 256, 1),
             LeakyReLU(0.2),
             Dropout(0.5),
-            WNConv1d(256, 256, 5, padding=2),
-            LeakyReLU(0.2),
             WNConv1d(256, n_mels, 1),
         )
 
