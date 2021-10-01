@@ -1,7 +1,7 @@
 from typing import Tuple
 
 import torch
-from torch.nn import Module, ModuleList, Sequential, LeakyReLU, Tanh, Dropout
+from torch.nn import Module, ModuleList, Sequential, LeakyReLU, Tanh, Dropout, Linear
 
 from stylemelgan.common import WNConv1d, WNConvTranspose1d
 
@@ -57,10 +57,11 @@ class Autoencoder(Module):
     def __init__(self, n_mels: int = 80) -> None:
         super().__init__()
         self.convs = Sequential(
-            WNConv1d(n_mels, 256, 3, padding=1),
+            WNConv1d(n_mels, 256, 5, padding=2),
             LeakyReLU(0.2),
             Dropout(0.5),
-            WNConv1d(256, n_mels, 3, padding=1),
+            WNConv1d(256, 256, 5, padding=2),
+            Linear(256, n_mels)
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
