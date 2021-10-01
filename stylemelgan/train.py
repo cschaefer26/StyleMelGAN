@@ -72,7 +72,7 @@ if __name__ == '__main__':
 
     best_stft = 9999
 
-    for epoch in range(1000):
+    for epoch in range(10000):
         pbar = tqdm.tqdm(enumerate(dataloader, 1), total=len(dataloader))
         for i, data in pbar:
             step += 1
@@ -134,7 +134,7 @@ if __name__ == '__main__':
             summary_writer.add_scalar('discriminator_loss', d_loss, global_step=step)
             summary_writer.add_scalar('auto_loss', auto_loss, global_step=step)
 
-            if step % 1 == 0:
+            if step % 1000 == 0:
                 g_model.eval()
                 val_norm_loss = 0
                 val_spec_loss = 0
