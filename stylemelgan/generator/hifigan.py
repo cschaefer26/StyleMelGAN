@@ -145,6 +145,17 @@ class HifiganGenerator(torch.nn.Module):
 
         return x
 
+    def inference(self,
+                  mel: torch.Tensor,
+                  pad_steps: int = 10) -> torch.Tensor:
+        with torch.no_grad():
+            pad = torch.full((1, self.mel_channels, pad_steps),
+                             self.padding_val).to(mel.device)
+            mel = torch.cat((mel, pad), dim=2)
+            audio = self.forward(mel).squeeze()
+            audio = audio[:-(self.hop_length * pad_steps)]
+        return audio
+
     @classmethod
     def from_config(cls, config_file: str) -> 'HifiganGenerator':
         with open(config_file, encoding='utf-8') as f:
