@@ -12,6 +12,7 @@ from torch.utils.tensorboard import SummaryWriter
 from stylemelgan.audio import Audio
 from stylemelgan.dataset import new_dataloader, AudioDataset
 from stylemelgan.discriminator import MultiScaleDiscriminator
+from stylemelgan.generator.hifigan import HifiganGenerator
 from stylemelgan.generator.melgan import MelganGenerator
 from stylemelgan.losses import stft, MultiResStftLoss
 from stylemelgan.utils import read_config
@@ -45,7 +46,7 @@ if __name__ == '__main__':
 
     step = 0
 
-    g_model = MelganGenerator(audio.n_mels).to(device)
+    g_model = HifiganGenerator.from_config('/Users/cschaefe/workspace/hifi-gan/config_v2.json').to(device)
     d_model = MultiScaleDiscriminator().to(device)
     train_cfg = config['training']
     g_optim = torch.optim.Adam(g_model.parameters(), lr=train_cfg['g_lr'], betas=(0.5, 0.9))
@@ -98,8 +99,8 @@ if __name__ == '__main__':
                 d_fake = d_model(wav_fake.detach())
                 d_real = d_model(wav_real)
                 for (_, score_fake), (_, score_real) in zip(d_fake, d_real):
-                    d_loss += F.relu(1.0 - score_real).mean()
-                    d_loss += F.relu(1.0 + score_fake).mean()
+                    d_loss += torch.mean(torch.sum(torch.pow(score_real - 1.0, 2), dim=[1, 2]))
+                    d_loss += torch.mean(torch.sum(torch.pow(score_fake, 2), dim=[1, 2]))
                 d_optim.zero_grad()
                 d_loss.backward()
                 d_optim.step()
@@ -107,9 +108,9 @@ if __name__ == '__main__':
                 # generator
                 d_fake = d_model(wav_fake)
                 for (feat_fake, score_fake), (feat_real, _) in zip(d_fake, d_real):
-                    g_loss += -score_fake.mean()
+                    g_loss += torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
                     for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
-                        g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
+                        g_loss += 10. * torch.mean(torch.abs(feat_fake_i - feat_real_i.detach()))
 
             factor = 1. if step < pretraining_steps else 0.
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))

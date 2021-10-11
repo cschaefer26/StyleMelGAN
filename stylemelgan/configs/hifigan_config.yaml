@@ -1,0 +1,32 @@
+model_type: 'melgan'
+model_name: 'bild_neurips_nostft'
+
+paths:
+  train_dir: '/Users/cschaefe/datasets/asvoice2_splitted_train'
+  val_dir: '/Users/cschaefe/datasets/asvoice2_splitted_val'
+  checkpoints: 'stylemelgan/checkpoints'
+
+audio:
+  sample_rate: 22050
+  n_mels: 80
+  n_fft: 1024
+  win_length: 1024
+  hop_length: 256
+  fmin: 0
+  fmax: 8000
+
+training:
+  batch_size: 16
+  pretraining_steps: 100000
+  segment_len: 16000
+  g_lr: 0.0001
+  d_lr: 0.0001
+  eval_steps: 10000
+  epochs: 100000
+  num_workers: 6
+
+model:
+  channels: [512, 256, 128, 64, 32]
+  res_layers: [5, 7, 8, 9]
+  relu_slope: 0.2
+  padding_val: -11.5129
