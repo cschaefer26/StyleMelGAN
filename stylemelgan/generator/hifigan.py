@@ -150,7 +150,7 @@ class HifiganGenerator(torch.nn.Module):
                   pad_steps: int = 10) -> torch.Tensor:
         with torch.no_grad():
             pad = torch.full((1, 80, pad_steps),
-                             self.padding_val).to(mel.device)
+                             -11.5129).to(mel.device)
             mel = torch.cat((mel, pad), dim=2)
             audio = self.forward(mel).squeeze()
             audio = audio[:-(256 * pad_steps)]
