@@ -11,7 +11,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from stylemelgan.audio import Audio
 from stylemelgan.dataset import new_dataloader, AudioDataset
-from stylemelgan.discriminator import MultiScaleDiscriminator
+from stylemelgan.discriminator import MultiScaleDiscriminator, MultiScaleSpecDiscriminator
 from stylemelgan.generator.hifigan import HifiganGenerator
 from stylemelgan.generator.melgan import MelganGenerator
 from stylemelgan.losses import stft, MultiResStftLoss
@@ -50,9 +50,11 @@ if __name__ == '__main__':
 
     g_model = HifiganGenerator.from_config(args.hificonfig).to(device)
     d_model = MultiScaleDiscriminator().to(device)
+    d_spec_model = MultiScaleSpecDiscriminator().to(device)
     train_cfg = config['training']
     g_optim = torch.optim.Adam(g_model.parameters(), lr=train_cfg['g_lr'], betas=(0.5, 0.9))
     d_optim = torch.optim.Adam(d_model.parameters(), lr=train_cfg['d_lr'], betas=(0.5, 0.9))
+    d_spec_optim = torch.optim.Adam(d_spec_model.parameters(), lr=train_cfg['d_lr'], betas=(0.5, 0.9))
 
     multires_stft_loss = MultiResStftLoss().to(device)
 
@@ -62,6 +64,8 @@ if __name__ == '__main__':
         g_optim.load_state_dict(checkpoint['g_optim'])
         d_model.load_state_dict(checkpoint['d_model'])
         d_optim.load_state_dict(checkpoint['d_optim'])
+        d_spec_model.load_state_dict(checkpoint['d_spec_model'])
+        d_spec_optim.load_state_dict(checkpoint['d_spec_optim'])
         step = checkpoint['step']
         print(f'Loaded model with step {step}')
     except Exception as e:
@@ -76,7 +80,7 @@ if __name__ == '__main__':
 
     stft = partial(stft, n_fft=1024, hop_length=256, win_length=1024)
 
-    pretraining_steps = train_cfg['pretraining_steps']
+    pretraining_steps = 0#train_cfg['pretraining_steps']
 
     summary_writer = SummaryWriter(log_dir=f'checkpoints/logs_{model_name}')
 
@@ -92,9 +96,12 @@ if __name__ == '__main__':
             wav_fake = g_model(mel)[:, :, :16000]
 
             d_loss = 0.0
+            d_spec_loss = 0.0
             g_loss = 0.0
             stft_norm_loss = 0.0
             stft_spec_loss = 0.0
+
+            d_loss_all = 0
 
             if step > pretraining_steps:
                 # discriminator
@@ -103,9 +110,21 @@ if __name__ == '__main__':
                 for (_, score_fake), (_, score_real) in zip(d_fake, d_real):
                     d_loss += torch.mean(torch.sum(torch.pow(score_real - 1.0, 2), dim=[1, 2]))
                     d_loss += torch.mean(torch.sum(torch.pow(score_fake, 2), dim=[1, 2]))
+
+                # spec discriminator
+                d_spec_fake = d_spec_model(wav_fake.detach())
+                d_spec_real = d_spec_model(wav_real.detach())
+                for (_, score_fake), (_, score_real) in zip(d_spec_fake, d_spec_real):
+                    d_spec_loss += torch.mean(torch.sum(torch.pow(score_real - 1.0, 2), dim=[1, 2]))
+                    d_spec_loss += torch.mean(torch.sum(torch.pow(score_fake, 2), dim=[1, 2]))
+
+                d_loss_all = d_loss + d_spec_loss
+
                 d_optim.zero_grad()
-                d_loss.backward()
+                d_spec_optim.zero_grad()
+                d_loss_all.backward()
                 d_optim.step()
+                d_spec_optim.step()
 
                 # generator
                 d_fake = d_model(wav_fake)
@@ -132,6 +151,7 @@ if __name__ == '__main__':
             summary_writer.add_scalar('stft_norm_loss', stft_norm_loss, global_step=step)
             summary_writer.add_scalar('stft_spec_loss', stft_spec_loss, global_step=step)
             summary_writer.add_scalar('discriminator_loss', d_loss, global_step=step)
+            summary_writer.add_scalar('spec_discriminator_loss', d_spec_loss, global_step=step)
 
             if step % train_cfg['eval_steps'] == 0:
                 g_model.eval()
@@ -166,6 +186,8 @@ if __name__ == '__main__':
                         'g_optim': g_optim.state_dict(),
                         'd_model': d_model.state_dict(),
                         'd_optim': d_optim.state_dict(),
+                        'd_spec_model': d_spec_model.state_dict(),
+                        'd_spec_optim': d_spec_optim.state_dict(),
                         'config': config,
                         'step': step
                     }, f'checkpoints/best_model_{model_name}.pt')
@@ -187,6 +209,8 @@ if __name__ == '__main__':
             'g_optim': g_optim.state_dict(),
             'd_model': d_model.state_dict(),
             'd_optim': d_optim.state_dict(),
+            'd_spec_model': d_spec_model.state_dict(),
+            'd_spec_optim': d_spec_optim.state_dict(),
             'config': config,
             'step': step
         }, f'checkpoints/latest_model__{model_name}.pt')
