@@ -33,6 +33,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=str,
                         default='stylemelgan/configs/melgan_config.yaml', help='points to config.yaml')
+    parser.add_argument('--hificonfig', type=str,
+                        default='stylemelgan/configs/melgan_config.yaml', help='points to config.yaml')
     args = parser.parse_args()
 
     config = read_config(args.config)
@@ -46,7 +48,7 @@ if __name__ == '__main__':
 
     step = 0
 
-    g_model = HifiganGenerator.from_config('/Users/cschaefe/workspace/hifi-gan/config_v2.json').to(device)
+    g_model = HifiganGenerator.from_config(args.hificonfig).to(device)
     d_model = MultiScaleDiscriminator().to(device)
     train_cfg = config['training']
     g_optim = torch.optim.Adam(g_model.parameters(), lr=train_cfg['g_lr'], betas=(0.5, 0.9))
