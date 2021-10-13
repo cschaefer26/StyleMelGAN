@@ -162,13 +162,17 @@ if __name__ == '__main__':
                     best_stft = val_norm_loss + val_spec_loss
                     print(f'\nnew best stft: {best_stft}')
                     torch.save({
-                        'generator': g_model.state_dict(),
+                        'g_model': g_model.state_dict(),
                         'g_optim': g_optim.state_dict(),
                         'd_model': d_model.state_dict(),
                         'd_optim': d_optim.state_dict(),
                         'config': config,
                         'step': step
                     }, f'checkpoints/best_model_{model_name}.pt')
+                    torch.save({
+                        'generator': g_model.state_dict(),
+                        'step': step
+                    }, f'checkpoints/best_g_{model_name}.pt')
                     summary_writer.add_audio('best_generated', wav_fake, sample_rate=audio.sample_rate, global_step=step)
 
                 g_model.train()
@@ -183,10 +187,15 @@ if __name__ == '__main__':
 
         # epoch end
         torch.save({
-            'generator': g_model.state_dict(),
+            'g_model': g_model.state_dict(),
             'g_optim': g_optim.state_dict(),
             'd_model': d_model.state_dict(),
             'd_optim': d_optim.state_dict(),
             'config': config,
             'step': step
         }, f'checkpoints/latest_model__{model_name}.pt')
+
+        torch.save({
+            'generator': g_model.state_dict(),
+            'step': step
+        }, f'checkpoints/latest_g_{model_name}.pt')
