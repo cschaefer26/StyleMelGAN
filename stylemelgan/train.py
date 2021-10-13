@@ -162,7 +162,7 @@ if __name__ == '__main__':
                     best_stft = val_norm_loss + val_spec_loss
                     print(f'\nnew best stft: {best_stft}')
                     torch.save({
-                        'g_model': g_model.state_dict(),
+                        'generator': g_model.state_dict(),
                         'g_optim': g_optim.state_dict(),
                         'd_model': d_model.state_dict(),
                         'd_optim': d_optim.state_dict(),
@@ -183,7 +183,7 @@ if __name__ == '__main__':
 
         # epoch end
         torch.save({
-            'g_model': g_model.state_dict(),
+            'generator': g_model.state_dict(),
             'g_optim': g_optim.state_dict(),
             'd_model': d_model.state_dict(),
             'd_optim': d_optim.state_dict(),
