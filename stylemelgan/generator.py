@@ -96,8 +96,8 @@ class Generator(nn.Module):
         # see https://github.com/seungwonpark/melgan/issues/8
         zero = torch.full((1, self.mel_channel, 10), -11.5129).to(mel.device)
         mel = torch.cat((mel, zero), dim=2)
-
-        audio = self.forward(mel)
+        with torch.no_grad():
+            audio = self.forward(mel)
         audio = audio.squeeze() # collapse all dimension except time axis
         audio = audio[:-(hop_length*10)]
         #audio = MAX_WAV_VALUE * audio
