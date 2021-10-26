@@ -1,9 +1,9 @@
 model_type: 'melgan'
-model_name: 'asvoice2_melgan_specdisc'
+model_name: 'asvoice2_universal_melgan'
 
 paths:
-  train_dir: '/Users/cschaefe/datasets/asvoice2_splitted_train'
-  val_dir: '/Users/cschaefe/datasets/asvoice2_splitted_val'
+  train_dir: '/Users/cschaefe/datasets/bild_voice_snippets'
+  val_dir: '/Users/cschaefe/datasets/bild_voice_snippets'
   checkpoints: 'stylemelgan/checkpoints'
 
 audio:

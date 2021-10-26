@@ -78,7 +78,7 @@ if __name__ == '__main__':
 
     pretraining_steps = 0
 
-    summary_writer = SummaryWriter(log_dir='checkpoints/logs_specdisc_log')
+    summary_writer = SummaryWriter(log_dir='checkpoints/logs_specdisc_universal')
 
     best_stft = 9999
 
@@ -105,15 +105,15 @@ if __name__ == '__main__':
                 d_fake = d_model(wav_fake.detach())
                 d_real = d_model(wav_real.detach())
                 for (_, score_fake), (_, score_real) in zip(d_fake, d_real):
-                    d_loss += torch.mean(torch.sum(torch.pow(score_real - 1.0, 2), dim=[1, 2]))
-                    d_loss += torch.mean(torch.sum(torch.pow(score_fake, 2), dim=[1, 2]))
+                    d_loss += F.relu(1.0 - score_real).mean()
+                    d_loss += F.relu(1.0 + score_fake).mean()
 
                 # spec discriminator
                 d_spec_fake = d_spec_model(wav_fake.detach())
                 d_spec_real = d_spec_model(wav_real.detach())
                 for (_, score_fake), (_, score_real) in zip(d_spec_fake, d_spec_real):
-                    d_spec_loss += torch.mean(torch.sum(torch.pow(score_real - 1.0, 2), dim=[1, 2]))
-                    d_spec_loss += torch.mean(torch.sum(torch.pow(score_fake, 2), dim=[1, 2]))
+                    d_spec_loss += F.relu(1.0 - score_real).mean()
+                    d_spec_loss += F.relu(1.0 + score_fake).mean()
 
                 d_loss_all = d_loss + d_spec_loss
 
@@ -128,20 +128,15 @@ if __name__ == '__main__':
                 for (feat_fake, score_fake), (feat_real, _) in zip(d_fake, d_real):
                     g_loss += -score_fake.mean()
                     for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
-                        g_loss += 10. * torch.mean(torch.abs(feat_fake_i - feat_real_i.detach()))
+                        g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
                 # generator
                 d_spec_fake = d_spec_model(wav_fake)
                 for (feat_fake, score_fake), (feat_real, _) in zip(d_spec_fake, d_spec_real):
                     g_loss += -score_fake.mean()
-                    for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
-                        g_loss += 10. * torch.mean(torch.abs(feat_fake_i - feat_real_i.detach()))
 
             factor = 1. if step < pretraining_steps else 0.
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
-            factor = 1.
-            if step > pretraining_steps:
-                factor = 0.
 
             g_loss_all = g_loss + factor * (stft_norm_loss + stft_spec_loss)
 

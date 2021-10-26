@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.nn import Sequential, LeakyReLU
+from torch.nn.utils import weight_norm
 
 from stylemelgan.common import WNConv1d
 from stylemelgan.losses import stft
@@ -12,6 +13,10 @@ class Identity(nn.Module):
 
     def forward(self, x):
         return x
+
+
+def WNConv2d(*args, **kwargs):
+    return weight_norm(nn.Conv2d(*args, **kwargs))
 
 
 class Discriminator(nn.Module):
@@ -79,32 +84,46 @@ class MultiScaleDiscriminator(nn.Module):
         return ret  # [(feat, score), (feat, score), (feat, score)]
 
 
+
+
+# from https://github.com/avi33/universalmelgan/blob/main/mel2wav/tfms_discriminator.py
+class DBlock(nn.Module):
+    def __init__(self):
+        super(DBlock, self).__init__()
+        model = [
+            WNConv2d(1, 32, 3, 1),
+            nn.LeakyReLU(0.2, True)
+        ]
+        for _ in range(3):
+            model += [
+                WNConv2d(32, 32, kernel_size=3, stride=(1, 2)),
+                nn.LeakyReLU(0.2, True)
+            ]
+        model += [
+            WNConv2d(32, 32, 1, 1),
+            nn.LeakyReLU(0.2, True),
+            WNConv2d(32, 1, 1, 1),
+        ]
+        self.block = nn.Sequential(*model)
+
+    def forward(self, x):
+        x = x.unsqueeze(1)
+        y = self.block(x)
+        return y
+
+
 class SpecDiscriminator(nn.Module):
 
     def __init__(self, n_fft: int, relu_slope: float = 0.2):
         super().__init__()
-        self.discriminator = nn.ModuleList([
-            Sequential(
-                WNConv1d(n_fft, 1024, kernel_size=7, stride=1, padding=3, padding_mode='reflect'),
-                LeakyReLU(relu_slope, inplace=True)
-            ),
-            Sequential(
-                WNConv1d(1024, 1024, kernel_size=7, stride=2, padding=3, groups=16),
-                LeakyReLU(relu_slope, inplace=True)
-            ),
-            Sequential(
-                WNConv1d(1024, 1024, kernel_size=7, stride=2, padding=3, groups=16),
-                LeakyReLU(relu_slope, inplace=True)
-            ),
-            WNConv1d(1024, 1, kernel_size=3, stride=1, padding=1)
-        ])
+        self.discriminator = DBlock()
 
     def forward(self, x):
         features = []
-        for module in self.discriminator:
-            x = module(x)
-            features.append(x)
-        return features[:-1], features[-1]
+        x = self.discriminator(x)
+        features.append(x)
+        return None, features[-1]
+
 
 
 class MultiScaleSpecDiscriminator(nn.Module):
@@ -124,7 +143,6 @@ class MultiScaleSpecDiscriminator(nn.Module):
         ret = list()
         for n_fft, hop_length, win_length, disc in zip(self.n_ffts, self.hop_sizes, self.win_lengths, self.discriminators):
             x_stft = stft(x=x.squeeze(1), n_fft=n_fft, hop_length=hop_length, win_length=win_length)
-            x_stft = torch.log(x_stft)
             ret.append(disc(x_stft.transpose(1, 2)))
 
         return ret  # [(feat, score), (feat, score), (feat, score)]
