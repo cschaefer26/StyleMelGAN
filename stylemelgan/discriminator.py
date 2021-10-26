@@ -124,6 +124,7 @@ class MultiScaleSpecDiscriminator(nn.Module):
         ret = list()
         for n_fft, hop_length, win_length, disc in zip(self.n_ffts, self.hop_sizes, self.win_lengths, self.discriminators):
             x_stft = stft(x=x.squeeze(1), n_fft=n_fft, hop_length=hop_length, win_length=win_length)
+            x_stft = torch.log(x_stft)
             ret.append(disc(x_stft.transpose(1, 2)))
 
         return ret  # [(feat, score), (feat, score), (feat, score)]
