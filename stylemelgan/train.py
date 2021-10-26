@@ -78,7 +78,7 @@ if __name__ == '__main__':
 
     pretraining_steps = 0
 
-    summary_writer = SummaryWriter(log_dir='checkpoints/logs_neurips_specdisc_256_nostft')
+    summary_writer = SummaryWriter(log_dir='checkpoints/logs_specdisc_log')
 
     best_stft = 9999
 
