@@ -121,7 +121,7 @@ class MultiScaleSpecDiscriminator(nn.Module):
 
     def forward(self, x):
         ret = list()
-        for i in range(3):
+        for i in range(1):
             n_fft = 2048
             hop_length = self.random.randint(*self.hop_sizes)
             win_length = self.random.randint(128, 2048)
