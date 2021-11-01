@@ -1,3 +1,5 @@
+from random import Random
+
 import torch
 import torch.nn as nn
 from torch.nn import Sequential, LeakyReLU
@@ -115,6 +117,7 @@ class MultiScaleSpecDiscriminator(nn.Module):
         self.hop_sizes = (50, 512)
         self.win_lengths = [200, 1200]
         self.disc = SpecDiscriminator(1024 // 2 + 1)
+        self.random = Random(42)
 
     def forward(self, x):
         ret = list()
