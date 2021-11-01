@@ -89,11 +89,11 @@ class SpecDiscriminator(nn.Module):
                 LeakyReLU(relu_slope, inplace=True)
             ),
             Sequential(
-                WNConv1d(256, 512, kernel_size=7, stride=2, padding=3, groups=8),
+                WNConv1d(256, 512, kernel_size=7, stride=1, padding=3, groups=8),
                 LeakyReLU(relu_slope, inplace=True)
             ),
             Sequential(
-                WNConv1d(512, 512, kernel_size=7, stride=2, padding=3, groups=8),
+                WNConv1d(512, 512, kernel_size=7, stride=1, padding=3, groups=8),
                 LeakyReLU(relu_slope, inplace=True)
             ),
             WNConv1d(512, 1, kernel_size=3, stride=1, padding=1)
