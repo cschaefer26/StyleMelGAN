@@ -134,8 +134,6 @@ if __name__ == '__main__':
                 d_spec_fake = d_spec_model(wav_fake)
                 for (feat_fake, score_fake), (feat_real, _) in zip(d_spec_fake, d_spec_real):
                     g_loss += -score_fake.mean()
-                    for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
-                        g_loss += 10. * torch.mean(torch.abs(feat_fake_i - feat_real_i.detach()))
 
             factor = 1. if step < pretraining_steps else 0.
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))

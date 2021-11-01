@@ -89,11 +89,11 @@ class SpecDiscriminator(nn.Module):
                 LeakyReLU(relu_slope, inplace=True)
             ),
             Sequential(
-                WNConv1d(1024, 1024, kernel_size=7, stride=2, padding=3, groups=16),
+                WNConv1d(1024, 1024, kernel_size=7, stride=1, padding=3, groups=16),
                 LeakyReLU(relu_slope, inplace=True)
             ),
             Sequential(
-                WNConv1d(1024, 1024, kernel_size=7, stride=2, padding=3, groups=16),
+                WNConv1d(1024, 1024, kernel_size=7, stride=1, padding=3, groups=16),
                 LeakyReLU(relu_slope, inplace=True)
             ),
             WNConv1d(1024, 1, kernel_size=3, stride=1, padding=1)
@@ -112,19 +112,19 @@ class MultiScaleSpecDiscriminator(nn.Module):
     def __init__(self):
         super().__init__()
 
-        self.n_ffts = [1024, 2048, 512]
-        self.hop_sizes = [120, 240, 50]
-        self.win_lengths = [600, 1200, 240]
-
-        self.discriminators = nn.ModuleList(
-            [SpecDiscriminator(n_fft // 2 + 1) for n_fft in self.n_ffts]
-        )
+        self.hop_sizes = (50, 512)
+        self.win_lengths = [200, 1200]
+        self.disc = SpecDiscriminator(1024 // 2 + 1)
 
     def forward(self, x):
         ret = list()
-        for n_fft, hop_length, win_length, disc in zip(self.n_ffts, self.hop_sizes, self.win_lengths, self.discriminators):
+        for i in range(5):
+            n_fft = 1024
+            hop_length = self.random.randint(*self.hop_sizes)
+            win_length = self.random.randint(*self.n_ffts)
+            win_length = min(win_length, n_fft)
             x_stft = stft(x=x.squeeze(1), n_fft=n_fft, hop_length=hop_length, win_length=win_length)
-            ret.append(disc(x_stft.transpose(1, 2)))
+            ret.append(self.disc(x_stft.transpose(1, 2)))
 
         return ret  # [(feat, score), (feat, score), (feat, score)]
 
