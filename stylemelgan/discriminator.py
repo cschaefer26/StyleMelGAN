@@ -87,15 +87,15 @@ class SpecDiscriminator(nn.Module):
         super().__init__()
         self.discriminator = nn.ModuleList([
             Sequential(
-                WNConv1d(n_fft, 512, kernel_size=7, stride=1, padding=3, padding_mode='reflect'),
+                WNConv1d(n_fft, 128, kernel_size=7, stride=1, padding=3, padding_mode='reflect'),
                 LeakyReLU(relu_slope, inplace=True)
             ),
             Sequential(
-                WNConv1d(512, 512, kernel_size=7, stride=1, padding=3, groups=16),
+                WNConv1d(128, 512, kernel_size=7, stride=2, padding=3, groups=16),
                 LeakyReLU(relu_slope, inplace=True)
             ),
             Sequential(
-                WNConv1d(512, 512, kernel_size=7, stride=1, padding=3, groups=16),
+                WNConv1d(512, 512, kernel_size=7, stride=2, padding=3, groups=16),
                 LeakyReLU(relu_slope, inplace=True)
             ),
             WNConv1d(512, 1, kernel_size=3, stride=1, padding=1)
