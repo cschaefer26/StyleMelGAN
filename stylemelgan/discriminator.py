@@ -87,18 +87,18 @@ class SpecDiscriminator(nn.Module):
         super().__init__()
         self.discriminator = nn.ModuleList([
             Sequential(
-                WNConv1d(n_fft, 1024, kernel_size=7, stride=1, padding=3, padding_mode='reflect'),
+                WNConv1d(n_fft, 512, kernel_size=7, stride=1, padding=3, padding_mode='reflect'),
                 LeakyReLU(relu_slope, inplace=True)
             ),
             Sequential(
-                WNConv1d(1024, 1024, kernel_size=7, stride=1, padding=3, groups=16),
+                WNConv1d(512, 512, kernel_size=7, stride=1, padding=3, groups=16),
                 LeakyReLU(relu_slope, inplace=True)
             ),
             Sequential(
-                WNConv1d(1024, 1024, kernel_size=7, stride=1, padding=3, groups=16),
+                WNConv1d(512, 512, kernel_size=7, stride=1, padding=3, groups=16),
                 LeakyReLU(relu_slope, inplace=True)
             ),
-            WNConv1d(1024, 1, kernel_size=3, stride=1, padding=1)
+            WNConv1d(512, 1, kernel_size=3, stride=1, padding=1)
         ])
 
     def forward(self, x):
@@ -121,7 +121,7 @@ class MultiScaleSpecDiscriminator(nn.Module):
 
     def forward(self, x):
         ret = list()
-        for i in range(1):
+        for i in range(3):
             n_fft = 2048
             hop_length = self.random.randint(*self.hop_sizes)
             win_length = self.random.randint(128, 2048)
