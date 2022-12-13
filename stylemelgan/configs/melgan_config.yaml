@@ -1,5 +1,5 @@
 model_type: 'melgan'
-model_name: 'bild_neurips_nostft'
+model_name: 'bild_ayn'
 
 paths:
   train_dir: '/Users/cschaefe/datasets/bild_melgan_small'
@@ -17,7 +17,8 @@ audio:
 
 training:
   batch_size: 16
-  pretraining_steps: 200000
+  eval_steps: 1
+  pretraining_steps: 10000
   segment_len: 16384
   g_lr: 0.0001
   d_lr: 0.0001
