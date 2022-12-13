@@ -19,24 +19,16 @@ class ResBlock(Module):
         self.conv_block = Sequential(
             LeakyReLU(relu_slope),
             WNConv1d(in_channels=in_channels, out_channels=out_channels,
-                     kernel_size=17, dilation=1, padding=8,
+                     kernel_size=3, dilation=dilation, padding=dilation,
                      padding_mode='reflect'),
             LeakyReLU(relu_slope),
             WNConv1d(in_channels=out_channels, out_channels=out_channels,
                      kernel_size=1)
         )
         self.residual = WNConv1d(in_channels=in_channels, out_channels=out_channels, kernel_size=1)
-        self.dilated_conv = WNConv1d(in_channels=in_channels,
-                                     out_channels=out_channels,
-                                     kernel_size=3,
-                                     dilation=dilation,
-                                     padding=dilation,
-                                     padding_mode='reflect')
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.residual(x) + self.conv_block(x)
-        x = F.leaky_relu(x, negative_slope=0.2)
-        x = self.dilated_conv(x)
         return x
 
 
@@ -52,7 +44,7 @@ class ResStack(Module):
         self.res_blocks = ModuleList([
             ResBlock(in_channels=in_channels if i == 0 else out_channels,
                      out_channels=out_channels,
-                     dilation=3 ** i,
+                     dilation=2 ** i,
                      relu_slope=relu_slope)
             for i in range(num_layers)
         ])
@@ -68,7 +60,7 @@ class MelganGenerator(Module):
     def __init__(self,
                  mel_channels: int,
                  channels: Tuple = (256, 128, 64, 32, 16),
-                 res_layers: Tuple = (5, 7, 8, 9),
+                 res_layers: Tuple = (7, 10, 11, 12),
                  relu_slope: float = 0.2,
                  padding_val: float = -11.5129) -> None:
         super().__init__()
