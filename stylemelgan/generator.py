@@ -1,6 +1,8 @@
+import time
 from typing import Tuple
 
 import torch
+import torch.nn.functional as F
 from torch.nn import Module, ModuleList, Sequential, LeakyReLU, Tanh
 
 from stylemelgan.common import WNConv1d, WNConvTranspose1d
@@ -17,16 +19,25 @@ class ResBlock(Module):
         self.conv_block = Sequential(
             LeakyReLU(relu_slope),
             WNConv1d(in_channels=in_channels, out_channels=out_channels,
-                     kernel_size=3, dilation=dilation, padding=dilation,
+                     kernel_size=17, dilation=1, padding=8,
                      padding_mode='reflect'),
             LeakyReLU(relu_slope),
             WNConv1d(in_channels=out_channels, out_channels=out_channels,
                      kernel_size=1)
         )
         self.residual = WNConv1d(in_channels=in_channels, out_channels=out_channels, kernel_size=1)
+        self.dilated_conv = WNConv1d(in_channels=in_channels,
+                                     out_channels=out_channels,
+                                     kernel_size=3,
+                                     dilation=dilation,
+                                     padding=dilation,
+                                     padding_mode='reflect')
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.residual(x) + self.conv_block(x)
+        x = self.residual(x) + self.conv_block(x)
+        x = F.leaky_relu(x, negative_slope=0.2)
+        x = self.dilated_conv(x)
+        return x
 
 
 class ResStack(Module):
@@ -56,7 +67,7 @@ class MelganGenerator(Module):
 
     def __init__(self,
                  mel_channels: int,
-                 channels: Tuple = (512, 256, 128, 64, 32),
+                 channels: Tuple = (256, 128, 64, 32, 16),
                  res_layers: Tuple = (5, 7, 8, 9),
                  relu_slope: float = 0.2,
                  padding_val: float = -11.5129) -> None:
@@ -108,9 +119,14 @@ if __name__ == '__main__':
 
     x = torch.randn(3, 80, 1000)
     print(x.shape)
+    start = time.time()
+    for i in range(10):
+        y = model(x)
+    dur = time.time() - start
 
-    y = model(x)
+    print('dur ', dur)
     print(y.shape)
+    assert y.shape == torch.Size([3, 1, 256000])
     #assert y.shape == torch.Size([3, 1, 2560])
 
     pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)

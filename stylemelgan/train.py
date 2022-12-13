@@ -63,7 +63,7 @@ if __name__ == '__main__':
 
     stft = partial(stft, n_fft=1024, hop_length=256, win_length=1024)
 
-    pretraining_steps = 0
+    pretraining_steps = 10000
 
     summary_writer = SummaryWriter(log_dir='checkpoints/logs_nostft_fixed')
 
