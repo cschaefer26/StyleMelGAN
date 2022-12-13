@@ -1,9 +1,10 @@
 model_type: 'melgan'
+model_name: 'bild_neurips_nostft'
 
 paths:
   train_dir: '/Users/cschaefe/datasets/bild_melgan_small'
   val_dir: '/Users/cschaefe/datasets/bild_melgan_small'
-  checkpoints: '/tmp/checkpoints'
+  checkpoints: 'stylemelgan/checkpoints'
 
 audio:
   sample_rate: 22050
@@ -16,6 +17,7 @@ audio:
 
 training:
   batch_size: 16
+  pretraining_steps: 200000
   segment_len: 16384
   g_lr: 0.0001
   d_lr: 0.0001

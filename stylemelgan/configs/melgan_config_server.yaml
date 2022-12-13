@@ -1,8 +1,8 @@
 model_type: 'melgan'
 
 paths:
-  train_dir: '/home/sysgen/chris/data/asvoice2_splitted_train'
-  val_dir: '/home/sysgen/chris/data/asvoice2_splitted_val'
+  train_dir: '/data/datasets/bild_final_hifigan_train'
+  val_dir: '/data/datasets/bild_final_hifigan_val'
   checkpoints: 'stylemelgan/checkpoints'
 
 audio:
