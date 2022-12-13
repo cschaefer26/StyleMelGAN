@@ -71,7 +71,7 @@ if __name__ == '__main__':
 
     pretraining_steps = train_cfg['pretraining_steps']
 
-    summary_writer = SummaryWriter(log_dir='checkpoints/logs_ayn')
+    summary_writer = SummaryWriter(log_dir=f'checkpoints/logs_{model_name}')
 
     best_stft = 9999
 

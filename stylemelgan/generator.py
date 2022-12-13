@@ -26,6 +26,7 @@ class ResBlock(Module):
                      kernel_size=1)
         )
         self.residual = WNConv1d(in_channels=in_channels, out_channels=out_channels, kernel_size=1)
+        self.residual_2 = WNConv1d(in_channels=in_channels, out_channels=out_channels, kernel_size=1)
         self.dilated_conv = WNConv1d(in_channels=in_channels,
                                      out_channels=out_channels,
                                      kernel_size=3,
@@ -36,7 +37,7 @@ class ResBlock(Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.residual(x) + self.conv_block(x)
         x = F.leaky_relu(x, negative_slope=0.2)
-        x = self.dilated_conv(x)
+        x = self.residual_2(x) + self.dilated_conv(x)
         return x
 
 
