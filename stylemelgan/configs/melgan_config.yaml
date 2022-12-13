@@ -1,9 +1,9 @@
 model_type: 'melgan'
 
 paths:
-  train_dir: '/Users/cschaefe/datasets/asvoice2_splitted_train'
-  val_dir: '/Users/cschaefe/datasets/asvoice2_splitted_val'
-  checkpoints: 'stylemelgan/checkpoints'
+  train_dir: '/Users/cschaefe/datasets/bild_melgan_small'
+  val_dir: '/Users/cschaefe/datasets/bild_melgan_small'
+  checkpoints: '/tmp/checkpoints'
 
 audio:
   sample_rate: 22050
@@ -16,7 +16,7 @@ audio:
 
 training:
   batch_size: 16
-  segment_len: 16000
+  segment_len: 16384
   g_lr: 0.0001
   d_lr: 0.0001
   stft_spec_loss_weight: 1.

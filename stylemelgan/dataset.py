@@ -67,7 +67,7 @@ def new_dataloader(data_path: Path,
 
 
 if __name__ == '__main__':
-    data_path = Path('/Users/cschaefe/datasets/asvoice2_splitted_train')
+    data_path = Path('/Users/cschaefe/datasets/bild_melgan_small')
     dataloader = new_dataloader(data_path=data_path, segment_len=16000, hop_len=256, batch_size=2)
     for item in dataloader:
         print(item['mel'].size())
