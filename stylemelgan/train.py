@@ -154,7 +154,7 @@ if __name__ == '__main__':
                 wav_fake, wav_real = val_wavs[-1]
                 if val_norm_loss + val_spec_loss < best_stft:
                     best_stft = val_norm_loss + val_spec_loss
-                    print(f'\nnew best stft: {best_stft}')
+                    #print(f'\nnew best stft: {best_stft}')
                     torch.save({
                         'g_model': g_model.state_dict(),
                         'g_optim': g_optim.state_dict(),
