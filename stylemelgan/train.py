@@ -82,6 +82,7 @@ if __name__ == '__main__':
             mel = data['mel'].to(device)
             wav_real = data['wav'].to(device)
 
+            print(wav_real.size())
             wav_fake = g_model(mel)[:, :, :16384]
 
             d_loss = 0.0
@@ -95,7 +96,7 @@ if __name__ == '__main__':
                 d_real = d_model(wav_real)
                 for (_, score_fake), (_, score_real) in zip(d_fake, d_real):
                     d_loss += torch.mean(torch.sum(torch.pow(score_real - 1.0, 2), dim=[1, 2]))
-                    d_loss += torch.mean(torch.sum(torch.pow(score_fake + 1.0, 2), dim=[1, 2]))
+                    d_loss += torch.mean(torch.sum(torch.pow(score_fake, 2), dim=[1, 2]))
                 d_optim.zero_grad()
                 d_loss.backward()
                 d_optim.step()
