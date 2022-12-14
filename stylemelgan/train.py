@@ -82,7 +82,7 @@ if __name__ == '__main__':
             mel = data['mel'].to(device)
             wav_real = data['wav'].to(device)
 
-            print(wav_real.size())
+            #print(wav_real.size())
             wav_fake = g_model(mel)[:, :, :16384]
 
             d_loss = 0.0
