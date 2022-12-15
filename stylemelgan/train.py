@@ -64,7 +64,7 @@ if __name__ == '__main__':
     except Exception as e:
         'Initializing model from scratch.'
 
-    dataloader = new_dataloader(data_path=train_data_path, segment_len=16384, hop_len=256, batch_size=16, num_workers=16)
+    dataloader = new_dataloader(data_path=train_data_path, segment_len=16000, hop_len=256, batch_size=16, num_workers=16)
     val_dataset = AudioDataset(data_path=val_data_path, segment_len=None, hop_len=256)
 
     stft = partial(stft, n_fft=1024, hop_length=256, win_length=1024)
@@ -83,7 +83,7 @@ if __name__ == '__main__':
             wav_real = data['wav'].to(device)
 
             #print(wav_real.size())
-            wav_fake = g_model(mel)[:, :, :16384]
+            wav_fake = g_model(mel)[:, :, :16000]
 
             d_loss = 0.0
             g_loss = 0.0
