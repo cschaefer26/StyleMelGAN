@@ -32,7 +32,7 @@ class AudioDataset(Dataset):
         wav_path = self.data_path / f'{file_id}.wav'
         wav, _ = librosa.load(wav_path)
         mel = torch.load(mel_path).squeeze(0)
-        if len(wav) < self.segment_len + 2000:
+        if self.segment_len is not None and len(wav) < self.segment_len + 2000:
             wav = np.pad(wav, (0, self.segment_len + 2000 - len(wav)), \
                            mode='constant', constant_values=0.0)
 
