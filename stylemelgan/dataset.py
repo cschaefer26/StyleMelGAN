@@ -1,7 +1,7 @@
 import random
 from pathlib import Path
 from typing import Dict, Union
-
+import numpy as np
 import librosa
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -31,8 +31,12 @@ class AudioDataset(Dataset):
         mel_path = self.data_path / f'{file_id}.mel'
         wav_path = self.data_path / f'{file_id}.wav'
         wav, _ = librosa.load(wav_path)
-        wav = torch.tensor(wav).float()
         mel = torch.load(mel_path).squeeze(0)
+        if len(wav) < self.segment_len + 2000:
+            wav = np.pad(wav, (0, self.segment_len + 2000 - len(wav)), \
+                           mode='constant', constant_values=0.0)
+
+        wav = torch.from_numpy(wav).unsqueeze(0).float()
 
         if self.segment_len is not None:
             max_mel_start = mel.size(1) - self.mel_segment_len
@@ -41,8 +45,9 @@ class AudioDataset(Dataset):
             mel = mel[:, mel_start:mel_end]
 
             audio_start = mel_start * self.hop_len
-            wav = wav[audio_start:audio_start+self.segment_len]
-        wav = wav.unsqueeze(0)
+            wav = wav[:, audio_start:audio_start+self.segment_len]
+
+        wav = wav + (1/32768) * torch.randn_like(wav)
         return {'mel': mel, 'wav': wav}
 
 
