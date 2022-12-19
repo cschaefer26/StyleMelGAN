@@ -73,7 +73,7 @@ if __name__ == '__main__':
 
     stft = partial(stft, n_fft=1024, hop_length=256, win_length=1024)
 
-    pretraining_steps = train_cfg['pretraining_steps']
+    pretraining_steps = 0
 
     summary_writer = SummaryWriter(log_dir=f'checkpoints/logs_{model_name}')
 
@@ -86,7 +86,7 @@ if __name__ == '__main__':
             mel = data['mel'].to(device)
             wav_real = data['wav'].to(device)
 
-            wav_fake = g_model(mel)[:, :, :16000]
+            wav_fake = g_model(mel)[:, :, :train_cfg['segment_len']]
 
             d_loss = 0.0
             g_loss = 0.0
@@ -98,8 +98,8 @@ if __name__ == '__main__':
                 d_fake = d_model(wav_fake.detach())
                 d_real = d_model(wav_real)
                 for (_, score_fake), (_, score_real) in zip(d_fake, d_real):
-                    d_loss += F.relu(1.0 - score_real).mean()
-                    d_loss += F.relu(1.0 + score_fake).mean()
+                    d_loss += torch.mean(torch.sum(torch.pow(score_real - 1.0, 2), dim=[1, 2]))
+                    d_loss += torch.mean(torch.sum(torch.pow(score_fake, 2), dim=[1, 2]))
                 d_optim.zero_grad()
                 d_loss.backward()
                 d_optim.step()
@@ -107,7 +107,7 @@ if __name__ == '__main__':
                 # generator
                 d_fake = d_model(wav_fake)
                 for (feat_fake, score_fake), (feat_real, _) in zip(d_fake, d_real):
-                    g_loss += -score_fake.mean()
+                    g_loss += torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
                     for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
                         g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
