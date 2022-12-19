@@ -1,3 +1,4 @@
+import time
 from typing import Tuple, Dict, Any
 
 import torch
@@ -22,9 +23,9 @@ class ResStack(nn.Module):
             nn.Sequential(
                 nn.LeakyReLU(0.2),
                 nn.ReflectionPad1d(3**i),
-                nn.utils.weight_norm(nn.Conv1d(channel, 4*channel, kernel_size=3, dilation=3**i)),
+                nn.utils.weight_norm(nn.Conv1d(channel, channel, kernel_size=3, dilation=3**i)),
                 nn.LeakyReLU(0.2),
-                nn.utils.weight_norm(nn.Conv1d(4*channel, channel, kernel_size=1)),
+                nn.utils.weight_norm(nn.Conv1d(channel, channel, kernel_size=1)),
             )
             for i in range(num_layers)
         ])
@@ -56,12 +57,22 @@ class Generator(nn.Module):
             nn.utils.weight_norm(nn.Conv1d(mel_channel, 512, kernel_size=7, stride=1)),
 
             nn.LeakyReLU(0.2),
-            nn.utils.weight_norm(nn.ConvTranspose1d(512, 256, kernel_size=16, stride=8, padding=4)),
+            nn.utils.weight_norm(nn.ConvTranspose1d(512, 256, kernel_size=8, stride=4, padding=2)),
 
-            ResStack(256, num_layers=5),
+            ResStack(256, num_layers=4),
 
             nn.LeakyReLU(0.2),
-            nn.utils.weight_norm(nn.ConvTranspose1d(256, 128, kernel_size=16, stride=8, padding=4)),
+            nn.utils.weight_norm(nn.ConvTranspose1d(256, 256, kernel_size=8, stride=4, padding=2)),
+
+            ResStack(256, num_layers=4),
+
+            nn.LeakyReLU(0.2),
+            nn.utils.weight_norm(nn.ConvTranspose1d(256, 128, kernel_size=4, stride=2, padding=1)),
+
+            ResStack(128, num_layers=5),
+
+            nn.LeakyReLU(0.2),
+            nn.utils.weight_norm(nn.ConvTranspose1d(128, 128, kernel_size=4, stride=2, padding=1)),
 
             ResStack(128, num_layers=7),
 
@@ -129,11 +140,14 @@ if __name__ == '__main__':
     config = read_config('../configs/melgan_config.yaml')
     model = Generator(80)
     x = torch.randn(3, 80, 1000)
-    print(x.shape)
+    start = time.time()
+    for i in range(10):
+        y = model(x)
+    dur = time.time() - start
+
+    print('dur ', dur)
 
     y = model(x)
-    print(y.shape)
-    #assert y.shape == torch.Size([3, 1, 2560])
+    assert y.shape == torch.Size([3, 1, 25600])
 
     pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(pytorch_total_params)
