@@ -13,6 +13,21 @@ import numpy as np
 MAX_WAV_VALUE = 32768.0
 
 
+class Upsample(nn.Module):
+
+    def __init__(self, dim_in, dim):
+        super().__init__()
+        self.pad = nn.ReflectionPad1d(1)
+        self.conv = nn.utils.weight_norm(nn.Conv1d(dim_in, dim, kernel_size=3, stride=1))
+
+    def forward(self, x):
+        x = F.interpolate(x, scale_factor=2, mode='nearest')
+        x = self.pad(x)
+        x = self.conv(x)
+        return x
+
+    def remove_weight_norm(self):
+        nn.utils.remove_weight_norm(self.conv)
 
 class ResStack(nn.Module):
     def __init__(self, channel, num_layers=4):
@@ -53,25 +68,37 @@ class Generator(nn.Module):
 
         self.generator = nn.Sequential(
             nn.ReflectionPad1d(3),
-            nn.utils.weight_norm(nn.Conv1d(mel_channel, 512, kernel_size=7, stride=1)),
+            nn.utils.weight_norm(nn.Conv1d(mel_channel, 256, kernel_size=7, stride=1)),
 
             nn.LeakyReLU(0.2),
-            nn.utils.weight_norm(nn.ConvTranspose1d(512, 256, kernel_size=16, stride=8, padding=4)),
+            #nn.utils.weight_norm(nn.ConvTranspose1d(512, 256, kernel_size=16, stride=8, padding=4)),
+            Upsample(256, 256),
+            nn.LeakyReLU(0.2),
+            Upsample(256, 256),
+            nn.LeakyReLU(0.2),
+            Upsample(256, 256),
 
             ResStack(256, num_layers=5),
 
+            #nn.utils.weight_norm(nn.ConvTranspose1d(256, 128, kernel_size=16, stride=8, padding=4)),
             nn.LeakyReLU(0.2),
-            nn.utils.weight_norm(nn.ConvTranspose1d(256, 128, kernel_size=16, stride=8, padding=4)),
+            Upsample(256, 128),
+            nn.LeakyReLU(0.2),
+            Upsample(128, 128),
+            nn.LeakyReLU(0.2),
+            Upsample(128, 128),
 
             ResStack(128, num_layers=7),
 
+            #nn.utils.weight_norm(nn.ConvTranspose1d(128, 64, kernel_size=4, stride=2, padding=1)),
             nn.LeakyReLU(0.2),
-            nn.utils.weight_norm(nn.ConvTranspose1d(128, 64, kernel_size=4, stride=2, padding=1)),
+            Upsample(128, 64),
 
             ResStack(64, num_layers=8),
 
+            #nn.utils.weight_norm(nn.ConvTranspose1d(64, 32, kernel_size=4, stride=2, padding=1)),
             nn.LeakyReLU(0.2),
-            nn.utils.weight_norm(nn.ConvTranspose1d(64, 32, kernel_size=4, stride=2, padding=1)),
+            Upsample(64, 32),
 
             ResStack(32, num_layers=9),
 
@@ -80,6 +107,7 @@ class Generator(nn.Module):
             nn.utils.weight_norm(nn.Conv1d(32, 1, kernel_size=7, stride=1)),
             nn.Tanh(),
         )
+
 
     def forward(self, mel):
         mel = (mel + 5.0) / 5.0 # roughly normalize spectrogram
