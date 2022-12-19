@@ -107,7 +107,7 @@ class Generator(nn.Module):
             pad = torch.full((1, 80, pad_steps), -11.5129).to(mel.device)
             mel = torch.cat((mel, pad), dim=2)
             audio = self.forward(mel).squeeze()
-            audio = audio[:-(self.hop_length * pad_steps)]
+            audio = audio[:-(256 * pad_steps)]
         return audio
 
     @classmethod
