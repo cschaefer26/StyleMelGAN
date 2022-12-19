@@ -73,7 +73,7 @@ if __name__ == '__main__':
 
     stft = partial(stft, n_fft=1024, hop_length=256, win_length=1024)
 
-    pretraining_steps = train_cfg['pretraining_steps']
+    pretraining_steps = train_cfg['segment_len']
 
     summary_writer = SummaryWriter(log_dir=f'checkpoints/logs_{model_name}')
 
@@ -139,7 +139,7 @@ if __name__ == '__main__':
                 for i, val_data in enumerate(val_dataset):
                     val_mel = val_data['mel'].to(device)
                     val_mel = val_mel.unsqueeze(0)
-                    wav_fake = g_model.inference(val_mel, pad_steps=80).squeeze().cpu().numpy()
+                    wav_fake = g_model.inference(val_mel).squeeze().cpu().numpy()
                     wav_real = val_data['wav'].detach().squeeze().cpu().numpy()
                     wav_f = torch.tensor(wav_fake).unsqueeze(0).to(device)
                     wav_r = torch.tensor(wav_real).unsqueeze(0).to(device)
