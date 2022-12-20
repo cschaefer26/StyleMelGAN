@@ -1,58 +1,38 @@
-from typing import Tuple, Dict, Any
+import time
 
 import torch
-from torch.nn import Module, ModuleList, Sequential, LeakyReLU, Tanh
-
-from stylemelgan.common import WNConv1d, WNConvTranspose1d
-from stylemelgan.utils import read_config
-import torch
-import torch.nn as nn
+from torch.nn import Module, Conv1d, InstanceNorm1d, LeakyReLU, Linear
+from torch.nn.utils import spectral_norm, weight_norm
+from torch.nn.functional import interpolate, relu
 import torch.nn.functional as F
-import numpy as np
-
+import torch.nn as nn
 MAX_WAV_VALUE = 32768.0
 
 
-class Upsample(nn.Module):
-
-    def __init__(self, dim_in, dim):
-        super().__init__()
-        self.pad = nn.ReflectionPad1d(1)
-        self.conv = nn.utils.weight_norm(nn.Conv1d(dim_in, dim, kernel_size=3, stride=1))
-
-    def forward(self, x):
-        x = F.interpolate(x, scale_factor=2, mode='nearest')
-        x = self.pad(x)
-        x = self.conv(x)
-        return x
-
-    def remove_weight_norm(self):
-        nn.utils.remove_weight_norm(self.conv)
-
 class ResStack(nn.Module):
-    def __init__(self, channel, num_layers=4):
+    def __init__(self, in_channel, channel, num_layers=4):
         super(ResStack, self).__init__()
 
         self.blocks = nn.ModuleList([
             nn.Sequential(
                 nn.LeakyReLU(0.2),
                 nn.ReflectionPad1d(3**i),
-                nn.utils.weight_norm(nn.Conv1d(channel, 4*channel, kernel_size=3, dilation=3**i)),
+                nn.utils.weight_norm(nn.Conv1d(in_channel if i == 0 else channel, channel, kernel_size=3, dilation=3**i)),
                 nn.LeakyReLU(0.2),
-                nn.utils.weight_norm(nn.Conv1d(4*channel, channel, kernel_size=1)),
+                nn.utils.weight_norm(nn.Conv1d(channel, channel, kernel_size=1)),
             )
             for i in range(num_layers)
         ])
 
         self.shortcuts = nn.ModuleList([
-            nn.utils.weight_norm(nn.Conv1d(channel, channel, kernel_size=1))
+            nn.utils.weight_norm(nn.Conv1d(in_channel if i == 0 else channel, channel, kernel_size=1))
             for i in range(num_layers)
         ])
 
-    def forward(self, x):
+    def forward(self, x, mel):
         for block, shortcut in zip(self.blocks, self.shortcuts):
             x = shortcut(x) + block(x)
-        return x
+        return x, mel
 
     def remove_weight_norm(self):
         for block, shortcut in zip(self.blocks, self.shortcuts):
@@ -61,57 +41,66 @@ class ResStack(nn.Module):
             nn.utils.remove_weight_norm(shortcut)
 
 
+class TadeUp(Module):
+
+    def __init__(self, mel_channels, channels: int, kernel_size=3):
+        super().__init__()
+        self.norm = InstanceNorm1d(channels)
+        self.relu = LeakyReLU(0.2)
+        self.conv_feat = weight_norm(Conv1d(mel_channels, channels, kernel_size=kernel_size, padding=kernel_size//2, padding_mode='reflect'))
+        self.conv_beta = weight_norm(Conv1d(channels, channels, kernel_size=kernel_size, padding=kernel_size//2, padding_mode='reflect'))
+        self.conv_gamma = weight_norm(Conv1d(channels, channels, kernel_size=kernel_size, padding=kernel_size//2, padding_mode='reflect'))
+
+    def forward(self, x, mel):
+        mel = F.interpolate(mel, scale_factor=2, mode='nearest')
+        x = F.interpolate(x, scale_factor=2, mode='nearest')
+        feat = self.conv_feat(mel)
+        feat = self.relu(feat)
+        gamma = self.conv_gamma(feat)
+        beta = self.conv_beta(feat)
+        c = self.norm(x)
+        x = c * gamma + beta
+        return x, mel
+
+
 class Generator(nn.Module):
     def __init__(self, mel_channel):
         super(Generator, self).__init__()
         self.mel_channel = mel_channel
+        self.first_conv = nn.Conv1d(mel_channel, 256,
+                                    kernel_size=3, padding=1, padding_mode='reflect')
 
-        self.generator = nn.Sequential(
-            nn.ReflectionPad1d(3),
-            nn.utils.weight_norm(nn.Conv1d(mel_channel, 256, kernel_size=7, stride=1)),
-
+        self.tades = nn.ModuleList([
+            TadeUp(mel_channel, 256),
+            TadeUp(mel_channel, 256),
+            TadeUp(mel_channel, 256),
+            ResStack(256, 128, num_layers=5),
+            TadeUp(mel_channel, 128),
+            TadeUp(mel_channel, 128),
+            TadeUp(mel_channel, 128),
+            ResStack(128, 64, num_layers=7),
+            TadeUp(mel_channel, 64),
+            ResStack(64, 32, num_layers=8),
+            TadeUp(mel_channel, 32),
+            ResStack(32, 32, num_layers=9)
+        ])
+        self.postnet = nn.Sequential(
             nn.LeakyReLU(0.2),
-            #nn.utils.weight_norm(nn.ConvTranspose1d(512, 256, kernel_size=16, stride=8, padding=4)),
-            Upsample(256, 256),
-            nn.LeakyReLU(0.2),
-            Upsample(256, 256),
-            nn.LeakyReLU(0.2),
-            Upsample(256, 256),
-
-            ResStack(256, num_layers=5),
-
-            #nn.utils.weight_norm(nn.ConvTranspose1d(256, 128, kernel_size=16, stride=8, padding=4)),
-            nn.LeakyReLU(0.2),
-            Upsample(256, 128),
-            nn.LeakyReLU(0.2),
-            Upsample(128, 128),
-            nn.LeakyReLU(0.2),
-            Upsample(128, 128),
-
-            ResStack(128, num_layers=7),
-
-            #nn.utils.weight_norm(nn.ConvTranspose1d(128, 64, kernel_size=4, stride=2, padding=1)),
-            nn.LeakyReLU(0.2),
-            Upsample(128, 64),
-
-            ResStack(64, num_layers=8),
-
-            #nn.utils.weight_norm(nn.ConvTranspose1d(64, 32, kernel_size=4, stride=2, padding=1)),
-            nn.LeakyReLU(0.2),
-            Upsample(64, 32),
-
-            ResStack(32, num_layers=9),
-
-            nn.LeakyReLU(0.2),
-            nn.ReflectionPad1d(3),
-            nn.utils.weight_norm(nn.Conv1d(32, 1, kernel_size=7, stride=1)),
+            weight_norm(nn.Conv1d(32, 1, kernel_size=7, padding=3, padding_mode='reflect')),
             nn.Tanh(),
         )
 
+    def _forward(self, mel):
+        mel = mel.detach()
+        x = self.first_conv(mel)
+        for tade in self.tades:
+            x, mel = tade(x, mel)
+        x = self.postnet(x)
+        return x
 
     def forward(self, mel):
         mel = (mel + 5.0) / 5.0 # roughly normalize spectrogram
-        return self.generator(mel)
+        return self._forward(mel)
 
     def eval(self, inference=False):
         super(Generator, self).eval()
@@ -121,47 +110,49 @@ class Generator(nn.Module):
             self.remove_weight_norm()
 
     def remove_weight_norm(self):
-        for idx, layer in enumerate(self.generator):
+        for idx, layer in enumerate(self.tades):
+            if len(layer.state_dict()) != 0:
+                try:
+                    nn.utils.remove_weight_norm(layer)
+                except:
+                    layer.remove_weight_norm()
+        for idx, layer in enumerate(self.postnet):
             if len(layer.state_dict()) != 0:
                 try:
                     nn.utils.remove_weight_norm(layer)
                 except:
                     layer.remove_weight_norm()
 
-    def inference(self,
-                  mel: torch.Tensor,
-                  pad_steps: int = 10) -> torch.Tensor:
-        with torch.no_grad():
-            pad = torch.full((1, 80, pad_steps), -11.5129).to(mel.device)
-            mel = torch.cat((mel, pad), dim=2)
-            audio = self.forward(mel).squeeze()
-            audio = audio[:-(256 * pad_steps)]
+    def inference(self, mel):
+        hop_length = 256
+        # pad input mel with zeros to cut artifact
+        # see https://github.com/seungwonpark/melgan/issues/8
+        zero = torch.full((1, self.mel_channel, 10), -11.5129).to(mel.device)
+        mel = torch.cat((mel, zero), dim=2)
+        audio = self.forward(mel)
+        audio = audio.squeeze() # collapse all dimension except time axis
+        audio = audio[:-(hop_length*10)]
+        audio = MAX_WAV_VALUE * audio
+        audio = audio.clamp(min=-MAX_WAV_VALUE, max=MAX_WAV_VALUE-1)
+        audio = audio.short()
+
         return audio
 
-    @classmethod
-    def from_config(cls, config: Dict[str, Any]) -> 'Generator':
-        return Generator(mel_channels=config['audio']['n_mels'],
-                               **config['model'])
-
-    @classmethod
-    def from_checkpoint(cls, file: str) -> 'Generator':
-        checkpoint = torch.load(file, map_location=torch.device('cpu'))
-        config = checkpoint['config']
-        model = Generator.from_config(config)
-        model.load_state_dict(config['g_model'])
-        return model
 
 
 if __name__ == '__main__':
 
-    config = read_config('../configs/melgan_config.yaml')
-    model = Generator(80)
-    x = torch.randn(3, 80, 1000)
-    print(x.shape)
+    #tade = TadeUp(mel_channels=80, channels=128)
+    generator = Generator(80)
+    start = time.time()
+    mel = torch.randn(3, 80, 1000)
+    x = torch.randn(3, 128, 1000)
+    y = generator(mel)
+    print(y.size())
 
-    y = model(x)
+    dur = time.time() - start
+    print(x.shape)
     print(y.shape)
+    print(f'dur: {dur}')
     #assert y.shape == torch.Size([3, 1, 2560])
 
-    pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(pytorch_total_params)
