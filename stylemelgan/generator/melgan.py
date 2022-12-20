@@ -68,7 +68,7 @@ class Generator(nn.Module):
         super(Generator, self).__init__()
         self.mel_channel = mel_channel
         self.first_conv = nn.Conv1d(mel_channel, 256,
-                                    kernel_size=3, padding=1, padding_mode='reflect')
+                                    kernel_size=7, padding=3, padding_mode='reflect')
 
         self.tades = nn.ModuleList([
             TadeUp(mel_channel, 256),
