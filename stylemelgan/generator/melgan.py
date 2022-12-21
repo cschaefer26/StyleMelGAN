@@ -58,6 +58,7 @@ class Generator(nn.Module):
             ResStack(128, num_layers=3),
 
             nn.LeakyReLU(0.2),
+            nn.ReflectionPad1d(3),
             nn.utils.weight_norm(nn.Conv1d(128, 512, kernel_size=7, stride=1)),
 
             nn.LeakyReLU(0.2),
