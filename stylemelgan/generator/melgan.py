@@ -24,7 +24,8 @@ class ResStack(nn.Module):
                 nn.ReflectionPad1d(3**i),
                 nn.utils.weight_norm(nn.Conv1d(channel, 4*channel, kernel_size=3, dilation=3**i)),
                 nn.LeakyReLU(0.2),
-                nn.utils.weight_norm(nn.Conv1d(4*channel, channel, kernel_size=1)),
+                nn.ReflectionPad1d(1),
+                nn.utils.weight_norm(nn.Conv1d(4*channel, channel, kernel_size=3)),
             )
             for i in range(num_layers)
         ])
@@ -52,8 +53,8 @@ class Generator(nn.Module):
         self.mel_channel = mel_channel
 
         self.generator = nn.Sequential(
-            nn.ReflectionPad1d(3),
-            nn.utils.weight_norm(nn.Conv1d(mel_channel, 256, kernel_size=7, stride=1)),
+            nn.ReflectionPad1d(7),
+            nn.utils.weight_norm(nn.Conv1d(mel_channel, 256, kernel_size=14, stride=1)),
 
             nn.LeakyReLU(0.2),
             nn.utils.weight_norm(nn.ConvTranspose1d(256, 128, kernel_size=16, stride=8, padding=4)),
