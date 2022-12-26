@@ -21,7 +21,7 @@ class ResStack(nn.Module):
         self.blocks = nn.ModuleList([
             nn.Sequential(
                 nn.LeakyReLU(0.2),
-                nn.ReflectionPad1d(3**i),
+                nn.ReflectionPad1d(2**i),
                 nn.utils.weight_norm(nn.Conv1d(channel, channel, kernel_size=3, dilation=2**i)),
                 nn.LeakyReLU(0.2),
                 nn.ReflectionPad1d(1),
