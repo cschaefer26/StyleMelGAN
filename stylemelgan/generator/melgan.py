@@ -22,10 +22,21 @@ class ResStack(nn.Module):
             nn.Sequential(
                 nn.LeakyReLU(0.2),
                 nn.ReflectionPad1d(3**i),
-                nn.utils.weight_norm(nn.Conv1d(channel, 4*channel, kernel_size=3, dilation=3**i)),
+                nn.utils.weight_norm(nn.Conv1d(channel, channel, kernel_size=3, dilation=3**i)),
+                nn.LeakyReLU(0.2),
+                nn.utils.weight_norm(nn.Conv1d(channel, channel, kernel_size=1)),
+            )
+            for i in range(num_layers)
+        ])
+
+        self.blocks2 = nn.ModuleList([
+            nn.Sequential(
+                nn.LeakyReLU(0.2),
+                nn.ReflectionPad1d(3**i),
+                nn.utils.weight_norm(nn.Conv1d(channel, channel, kernel_size=3, dilation=3**i)),
                 nn.LeakyReLU(0.2),
                 nn.ReflectionPad1d(1),
-                nn.utils.weight_norm(nn.Conv1d(4*channel, channel, kernel_size=3)),
+                nn.utils.weight_norm(nn.Conv1d(channel, channel, kernel_size=3)),
             )
             for i in range(num_layers)
         ])
@@ -36,8 +47,8 @@ class ResStack(nn.Module):
         ])
 
     def forward(self, x):
-        for block, shortcut in zip(self.blocks, self.shortcuts):
-            x = shortcut(x) + block(x)
+        for block, block2, shortcut in zip(self.blocks, self.blocks2, self.shortcuts):
+            x = shortcut(x) + 0.5 * block(x) + 0.5 * block2(x)
         return x
 
     def remove_weight_norm(self):
@@ -114,7 +125,7 @@ class Generator(nn.Module):
     @classmethod
     def from_config(cls, config: Dict[str, Any]) -> 'Generator':
         return Generator(mel_channels=config['audio']['n_mels'],
-                               **config['model'])
+                         **config['model'])
 
     @classmethod
     def from_checkpoint(cls, file: str) -> 'Generator':
@@ -126,11 +137,16 @@ class Generator(nn.Module):
 
 
 if __name__ == '__main__':
-
+    import time
     config = read_config('../configs/melgan_config.yaml')
     model = Generator(80)
     x = torch.randn(3, 80, 1000)
-    print(x.shape)
+    start = time.time()
+    for i in range(10):
+        y = model(x)
+    dur = time.time() - start
+
+    print('dur ', dur)
 
     y = model(x)
     print(y.shape)
