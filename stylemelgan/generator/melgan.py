@@ -22,10 +22,10 @@ class ResStack(nn.Module):
             nn.Sequential(
                 nn.LeakyReLU(0.2),
                 nn.ReflectionPad1d(3**i),
-                nn.utils.weight_norm(nn.Conv1d(channel, 4*channel, kernel_size=3, dilation=3**i)),
+                nn.utils.weight_norm(nn.Conv1d(channel, 2*channel, kernel_size=3, dilation=3**i)),
                 nn.LeakyReLU(0.2),
                 nn.ReflectionPad1d(1),
-                nn.utils.weight_norm(nn.Conv1d(4*channel, channel, kernel_size=3)),
+                nn.utils.weight_norm(nn.Conv1d(2*channel, channel, kernel_size=3)),
             )
             for i in range(num_layers)
         ])
