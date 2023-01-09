@@ -22,21 +22,10 @@ class ResStack(nn.Module):
             nn.Sequential(
                 nn.LeakyReLU(0.2),
                 nn.ReflectionPad1d(3**i),
-                nn.utils.weight_norm(nn.Conv1d(channel, channel, kernel_size=3, dilation=3**i)),
-                nn.LeakyReLU(0.2),
-                nn.utils.weight_norm(nn.Conv1d(channel, channel, kernel_size=1)),
-            )
-            for i in range(num_layers)
-        ])
-
-        self.blocks2 = nn.ModuleList([
-            nn.Sequential(
-                nn.LeakyReLU(0.2),
-                nn.ReflectionPad1d(3**i),
-                nn.utils.weight_norm(nn.Conv1d(channel, channel, kernel_size=3, dilation=3**i)),
+                nn.utils.weight_norm(nn.Conv1d(channel, 4*channel, kernel_size=3, dilation=3**i)),
                 nn.LeakyReLU(0.2),
                 nn.ReflectionPad1d(1),
-                nn.utils.weight_norm(nn.Conv1d(channel, channel, kernel_size=3)),
+                nn.utils.weight_norm(nn.Conv1d(4*channel, channel, kernel_size=3)),
             )
             for i in range(num_layers)
         ])
@@ -47,8 +36,8 @@ class ResStack(nn.Module):
         ])
 
     def forward(self, x):
-        for block, block2, shortcut in zip(self.blocks, self.blocks2, self.shortcuts):
-            x = shortcut(x) + 0.5 * block(x) + 0.5 * block2(x)
+        for block, shortcut in zip(self.blocks, self.shortcuts):
+            x = shortcut(x) + block(x)
         return x
 
     def remove_weight_norm(self):
@@ -65,10 +54,10 @@ class Generator(nn.Module):
 
         self.generator = nn.Sequential(
             nn.ReflectionPad1d(3),
-            nn.utils.weight_norm(nn.Conv1d(mel_channel, 256, kernel_size=7, stride=1)),
+            nn.utils.weight_norm(nn.Conv1d(mel_channel, 512, kernel_size=7, stride=1)),
 
             nn.LeakyReLU(0.2),
-            nn.utils.weight_norm(nn.ConvTranspose1d(256, 128, kernel_size=16, stride=8, padding=4)),
+            nn.utils.weight_norm(nn.ConvTranspose1d(512, 128, kernel_size=16, stride=8, padding=4)),
 
             ResStack(128, num_layers=5),
 
@@ -142,14 +131,14 @@ if __name__ == '__main__':
     model = Generator(80)
     x = torch.randn(3, 80, 1000)
     start = time.time()
-    for i in range(10):
+    for i in range(1):
         y = model(x)
     dur = time.time() - start
 
     print('dur ', dur)
 
-    y = model(x)
-    print(y.shape)
+    #y = model(x)
+    #print(y.shape)
     #assert y.shape == torch.Size([3, 1, 2560])
 
     pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
