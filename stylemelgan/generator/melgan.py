@@ -256,9 +256,9 @@ if __name__ == '__main__':
 
     print('dur ', dur)
 
-    #y = model(x)
-    #print(y.shape)
-    #assert y.shape == torch.Size([3, 1, 2560])
+    y = model(x)
+    print(y.shape)
+    assert y.shape == torch.Size([3, 1, 256000])
 
     pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(pytorch_total_params)
