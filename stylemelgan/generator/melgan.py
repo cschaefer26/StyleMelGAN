@@ -54,15 +54,15 @@ class Generator(nn.Module):
 
         self.generator = nn.Sequential(
             nn.ReflectionPad1d(3),
-            nn.utils.weight_norm(nn.Conv1d(mel_channel, 512, kernel_size=7, stride=1)),
+            nn.utils.weight_norm(nn.Conv1d(mel_channel, 1024, kernel_size=7, stride=1)),
 
             nn.LeakyReLU(0.2),
-            nn.utils.weight_norm(nn.ConvTranspose1d(512, 128, kernel_size=16, stride=8, padding=4)),
+            nn.utils.weight_norm(nn.ConvTranspose1d(1024, 256, kernel_size=16, stride=8, padding=4)),
 
-            ResStack(128, num_layers=5),
+            ResStack(256, num_layers=5),
 
             nn.LeakyReLU(0.2),
-            nn.utils.weight_norm(nn.ConvTranspose1d(128, 64, kernel_size=16, stride=8, padding=4)),
+            nn.utils.weight_norm(nn.ConvTranspose1d(256, 64, kernel_size=16, stride=8, padding=4)),
 
             ResStack(64, num_layers=7),
 
