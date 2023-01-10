@@ -48,32 +48,32 @@ class Generator(nn.Module):
         self.mel_channel = mel_channel
 
         self.generator = nn.Sequential(
-            nn.ReflectionPad1d(7),
-            nn.utils.weight_norm(nn.Conv1d(mel_channel, 256, kernel_size=15, stride=1)),
+            nn.ReflectionPad1d(3),
+            nn.utils.weight_norm(nn.Conv1d(mel_channel, 512, kernel_size=7, stride=1)),
+
+            nn.LeakyReLU(0.2),
+            nn.utils.weight_norm(nn.ConvTranspose1d(512, 256, kernel_size=16, stride=8, padding=4)),
+
+            ResStack(256, num_layers=5),
 
             nn.LeakyReLU(0.2),
             nn.utils.weight_norm(nn.ConvTranspose1d(256, 128, kernel_size=16, stride=8, padding=4)),
 
-            ResStack(128, num_layers=5),
+            ResStack(128, num_layers=7),
 
             nn.LeakyReLU(0.2),
-            nn.utils.weight_norm(nn.ConvTranspose1d(128, 64, kernel_size=16, stride=8, padding=4)),
+            nn.utils.weight_norm(nn.ConvTranspose1d(128, 64, kernel_size=4, stride=2, padding=1)),
 
-            ResStack(64, num_layers=7),
+            ResStack(64, num_layers=8),
 
             nn.LeakyReLU(0.2),
             nn.utils.weight_norm(nn.ConvTranspose1d(64, 32, kernel_size=4, stride=2, padding=1)),
 
-            ResStack(32, num_layers=8),
-
-            nn.LeakyReLU(0.2),
-            nn.utils.weight_norm(nn.ConvTranspose1d(32, 16, kernel_size=4, stride=2, padding=1)),
-
-            ResStack(16, num_layers=9),
+            ResStack(32, num_layers=9),
 
             nn.LeakyReLU(0.2),
             nn.ReflectionPad1d(3),
-            nn.utils.weight_norm(nn.Conv1d(16, 1, kernel_size=7, stride=1)),
+            nn.utils.weight_norm(nn.Conv1d(32, 1, kernel_size=7, stride=1)),
             nn.Tanh(),
         )
 
@@ -133,13 +133,12 @@ if __name__ == '__main__':
 
 
     print(len([p for p in model.parameters() if p.requires_grad]))
-    exit()
     x = torch.randn(3, 80, 1000)
     print(x.shape)
 
     y = model(x)
     print(y.shape)
-    #assert y.shape == torch.Size([3, 1, 2560])
+    assert y.shape == torch.Size([3, 1, 256000])
 
     pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(pytorch_total_params)
