@@ -111,9 +111,9 @@ if __name__ == '__main__':
                     #for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
                     #    g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
-            factor = 10. if step < pretraining_steps else 2.5
+            factor = 10. if step < pretraining_steps else 1.
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
-            g_loss_all = g_loss + factor * (stft_norm_loss + stft_spec_loss)
+            g_loss_all = 2.5 * g_loss + factor * (stft_norm_loss + stft_spec_loss)
 
             g_optim.zero_grad()
             g_loss_all.backward()
