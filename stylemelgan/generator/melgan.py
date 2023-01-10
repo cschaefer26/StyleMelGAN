@@ -1,14 +1,10 @@
-from typing import Tuple, Dict, Any
+from typing import Dict, Any
 
-import torch
-from torch.nn import Module, ModuleList, Sequential, LeakyReLU, Tanh
-
-from stylemelgan.common import WNConv1d, WNConvTranspose1d
-from stylemelgan.utils import read_config
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import numpy as np
+from torch.nn import ConvTranspose1d
+
+from stylemelgan.utils import read_config
 
 MAX_WAV_VALUE = 32768.0
 
@@ -128,6 +124,16 @@ if __name__ == '__main__':
 
     config = read_config('../configs/melgan_config.yaml')
     model = Generator(80)
+    print(len(list(model.parameters())))
+
+    for child in  model.generator.children():
+        for param in child.parameters():
+            if isinstance(child, ConvTranspose1d):
+                param.requires_grad = False
+
+
+    print(len([p for p in model.parameters() if p.requires_grad]))
+    exit()
     x = torch.randn(3, 80, 1000)
     print(x.shape)
 
