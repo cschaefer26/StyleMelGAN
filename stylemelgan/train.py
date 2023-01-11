@@ -61,10 +61,7 @@ if __name__ == '__main__':
 
     for child in g_model.generator.children():
         for param in child.parameters():
-            if isinstance(child, ConvTranspose1d):
-                param.requires_grad = True
-            else:
-                param.requires_grad = False
+            param.requires_grad = True
 
     g_optim_rest = torch.optim.Adam([p for p in g_model.parameters() if p.requires_grad], lr=train_cfg['g_lr'], betas=(0.5, 0.9))
 
