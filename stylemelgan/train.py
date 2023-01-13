@@ -50,7 +50,10 @@ if __name__ == '__main__':
     train_cfg = config['training']
     g_optim = torch.optim.Adam(g_model.parameters(), lr=train_cfg['g_lr'], betas=(0.5, 0.9))
     d_optim = torch.optim.Adam(d_model.parameters(), lr=train_cfg['d_lr'], betas=(0.5, 0.9))
-
+    for g in g_optim.param_groups:
+        g['lr'] = train_cfg['g_lr']
+    for g in d_optim.param_groups:
+        g['lr'] = train_cfg['d_lr']
     multires_stft_loss = MultiResStftLoss().to(device)
 
     try:
