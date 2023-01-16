@@ -52,21 +52,21 @@ class Generator(nn.Module):
         self.mel_channel = mel_channel
 
         self.generator = nn.Sequential(
-            nn.ReflectionPad1d(7),
-            nn.utils.weight_norm(nn.Conv1d(mel_channel, 256, kernel_size=15, stride=1)),
+            nn.ReflectionPad1d(3),
+            nn.utils.weight_norm(nn.Conv1d(mel_channel, 2048, kernel_size=7, stride=1)),
 
             nn.LeakyReLU(0.2),
-            nn.utils.weight_norm(nn.ConvTranspose1d(256, 128, kernel_size=16, stride=8, padding=4)),
+            nn.utils.weight_norm(nn.ConvTranspose1d(2048, 512, kernel_size=16, stride=8, padding=4)),
 
-            ResStack(128, num_layers=5),
-
-            nn.LeakyReLU(0.2),
-            nn.utils.weight_norm(nn.ConvTranspose1d(128, 64, kernel_size=16, stride=8, padding=4)),
-
-            ResStack(64, num_layers=7),
+            ResStack(512, num_layers=5),
 
             nn.LeakyReLU(0.2),
-            nn.utils.weight_norm(nn.ConvTranspose1d(64, 32, kernel_size=4, stride=2, padding=1)),
+            nn.utils.weight_norm(nn.ConvTranspose1d(512, 128, kernel_size=16, stride=8, padding=4)),
+
+            ResStack(128, num_layers=7),
+
+            nn.LeakyReLU(0.2),
+            nn.utils.weight_norm(nn.ConvTranspose1d(128, 32, kernel_size=4, stride=2, padding=1)),
 
             ResStack(32, num_layers=8),
 
@@ -125,14 +125,19 @@ class Generator(nn.Module):
 
 
 if __name__ == '__main__':
-
+    import time
     config = read_config('../configs/melgan_config.yaml')
     model = Generator(80)
     x = torch.randn(3, 80, 1000)
-    print(x.shape)
+    start = time.time()
+    for i in range(1):
+        y = model(x)
+    dur = time.time() - start
 
-    y = model(x)
-    print(y.shape)
+    print('dur ', dur)
+
+    #y = model(x)
+    #print(y.shape)
     #assert y.shape == torch.Size([3, 1, 2560])
 
     pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
