@@ -1,5 +1,5 @@
 model_type: 'melgan'
-model_name: 'bild_neurips_nostft'
+model_name: 'bild_pyramid'
 
 paths:
   train_dir: '/data/datasets/bild_stylemelgan_train'
