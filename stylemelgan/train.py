@@ -111,12 +111,13 @@ if __name__ == '__main__':
                 d_fake = d_model(wav_fake)
                 for (feat_fake, score_fake), (feat_real, _) in zip(d_fake, d_real):
                     g_loss += torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
-                    #for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
-                    #    g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
+                    for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
+                        g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
-            factor = 1. if step < pretraining_steps else 1.
+            factor = 1. if step < pretraining_steps else 0.
+
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
-            g_loss_all = 2.5 * g_loss + factor * (stft_norm_loss + stft_spec_loss)
+            g_loss_all = g_loss + factor * (stft_norm_loss + stft_spec_loss)
 
             g_optim.zero_grad()
             g_loss_all.backward()
