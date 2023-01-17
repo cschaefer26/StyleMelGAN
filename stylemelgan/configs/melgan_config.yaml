@@ -1,9 +1,9 @@
 model_type: 'melgan'
-model_name: 'bild_neurips_nostft'
+model_name: 'bild_stft_cont'
 
 paths:
-  train_dir: '/Users/cschaefe/datasets/asvoice2_splitted_train'
-  val_dir: '/Users/cschaefe/datasets/asvoice2_splitted_val'
+  train_dir: '/Users/cschaefe/datasets/bild_melgan_small'
+  val_dir: '/Users/cschaefe/datasets/bild_melgan_small'
   checkpoints: 'stylemelgan/checkpoints'
 
 audio:
