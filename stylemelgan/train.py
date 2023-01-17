@@ -117,7 +117,7 @@ if __name__ == '__main__':
 
             factor = 1. if step < pretraining_steps else 1.
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
-            g_loss_all = 2.5 * g_loss + factor * (stft_norm_loss + stft_spec_loss)
+            g_loss_all = 0.25 * g_loss + factor * (stft_norm_loss + stft_spec_loss)
 
             g_optim.zero_grad()
             g_loss_all.backward()
