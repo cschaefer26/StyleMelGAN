@@ -58,10 +58,10 @@ if __name__ == '__main__':
 
     try:
         checkpoint = torch.load(f'checkpoints/latest_model__{model_name}.pt', map_location=device)
-        g_model.load_state_dict(checkpoint['g_model'])
-        g_optim.load_state_dict(checkpoint['g_optim'])
-        d_model.load_state_dict(checkpoint['d_model'])
-        d_optim.load_state_dict(checkpoint['d_optim'])
+        g_model.load_state_dict(checkpoint['model_g'])
+        g_optim.load_state_dict(checkpoint['optim_g'])
+        d_model.load_state_dict(checkpoint['model_d'])
+        d_optim.load_state_dict(checkpoint['optim_d'])
         step = checkpoint['step']
         print(f'Loaded model with step {step}')
     except Exception as e:
@@ -183,10 +183,10 @@ if __name__ == '__main__':
 
         # epoch end
         torch.save({
-            'g_model': g_model.state_dict(),
-            'g_optim': g_optim.state_dict(),
-            'd_model': d_model.state_dict(),
-            'd_optim': d_optim.state_dict(),
+            'model_g': g_model.state_dict(),
+            'optim_g': g_optim.state_dict(),
+            'model_d': d_model.state_dict(),
+            'optim_d': d_optim.state_dict(),
             'config': config,
             'step': step
         }, f'checkpoints/latest_model__{model_name}.pt')
