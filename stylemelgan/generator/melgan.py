@@ -53,7 +53,7 @@ class Generator(nn.Module):
 
         self.generator = nn.Sequential(
 
-            ResStack(80, num_layers=3),
+            ResStack(80, num_layers=2),
 
             nn.LeakyReLU(0.2),
 
