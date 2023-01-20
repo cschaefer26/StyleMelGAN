@@ -52,12 +52,13 @@ class Generator(nn.Module):
         self.mel_channel = mel_channel
 
         self.generator = nn.Sequential(
-            nn.utils.weight_norm(nn.Conv1d(mel_channel, mel_channel, kernel_size=1, stride=1)),
+
+            ResStack(80, num_layers=3),
 
             nn.LeakyReLU(0.2),
-            nn.ReflectionPad1d(3),
 
-            nn.utils.weight_norm(nn.Conv1d(mel_channel, 2048, kernel_size=7, stride=1)),
+            nn.ReflectionPad1d(3),
+            nn.utils.weight_norm(nn.Conv1d(80, 2048, kernel_size=7, stride=1)),
 
             nn.LeakyReLU(0.2),
             nn.utils.weight_norm(nn.ConvTranspose1d(2048, 512, kernel_size=16, stride=8, padding=4)),
