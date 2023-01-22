@@ -1,4 +1,5 @@
 import random
+import numpy as np
 from pathlib import Path
 from typing import Dict, Union
 
@@ -52,7 +53,18 @@ class AudioDataset(Dataset):
             wav_end = wav_start + self.segment_len
             wav = wav[wav_start:wav_end]
             wav = wav + (1 / 32768) * torch.randn_like(wav)
+
         wav = wav.unsqueeze(0)
+        """
+        pitch, _, _ = librosa.pyin(wav.squeeze().numpy(),
+                                   fmin=100,
+                                   fmax=600,
+                                   sr=22050,
+                                   frame_length=1024,
+                                   hop_length=256)
+        np.nan_to_num(pitch, copy=False, nan=0.)
+        print(pitch)
+        """
         return {'mel': mel, 'wav': wav}
 
 
