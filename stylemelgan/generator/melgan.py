@@ -46,44 +46,67 @@ class ResStack(nn.Module):
             nn.utils.remove_weight_norm(shortcut)
 
 
+class Prenet(nn.Module):
+
+    def __init__(self, dims=512):
+        super(Prenet, self).__init__()
+        self.pitch_conv = nn.Conv1d(1, dims, kernel_size=3, padding=1)
+        self.pre_conv = nn.Sequential(
+            nn.ReflectionPad1d(3),
+            nn.utils.weight_norm(nn.Conv1d(80, dims, kernel_size=7, stride=1))
+        )
+
+    def forward(self, mel, pitch):
+        pre = self.pre_conv(mel)
+        pitch = self.pitch_conv(pitch)
+        return pre + pitch
+
+
+
 class Generator(nn.Module):
     def __init__(self, mel_channel):
         super(Generator, self).__init__()
         self.mel_channel = mel_channel
 
-        self.generator = nn.Sequential(
+        self.pitch_pred = nn.Sequential(
             nn.ReflectionPad1d(3),
-            nn.utils.weight_norm(nn.Conv1d(mel_channel, 2048, kernel_size=7, stride=1)),
+            nn.utils.weight_norm(nn.Conv1d(mel_channel, 1, kernel_size=7, stride=1)),
+        )
+
+        self.prenet = Prenet(512)
+
+        self.generator = nn.Sequential(
+            nn.LeakyReLU(0.2),
+            nn.utils.weight_norm(nn.ConvTranspose1d(512, 256, kernel_size=16, stride=8, padding=4)),
+
+            ResStack(256, num_layers=5),
 
             nn.LeakyReLU(0.2),
-            nn.utils.weight_norm(nn.ConvTranspose1d(2048, 512, kernel_size=16, stride=8, padding=4)),
-
-            ResStack(512, num_layers=5),
-
-            nn.LeakyReLU(0.2),
-            nn.utils.weight_norm(nn.ConvTranspose1d(512, 128, kernel_size=16, stride=8, padding=4)),
+            nn.utils.weight_norm(nn.ConvTranspose1d(256, 128, kernel_size=16, stride=8, padding=4)),
 
             ResStack(128, num_layers=7),
 
             nn.LeakyReLU(0.2),
-            nn.utils.weight_norm(nn.ConvTranspose1d(128, 32, kernel_size=4, stride=2, padding=1)),
+            nn.utils.weight_norm(nn.ConvTranspose1d(128, 64, kernel_size=4, stride=2, padding=1)),
 
-            ResStack(32, num_layers=8),
+            ResStack(64, num_layers=8),
 
             nn.LeakyReLU(0.2),
-            nn.utils.weight_norm(nn.ConvTranspose1d(32, 16, kernel_size=4, stride=2, padding=1)),
+            nn.utils.weight_norm(nn.ConvTranspose1d(64, 32, kernel_size=4, stride=2, padding=1)),
 
-            ResStack(16, num_layers=9),
+            ResStack(32, num_layers=9),
 
             nn.LeakyReLU(0.2),
             nn.ReflectionPad1d(3),
-            nn.utils.weight_norm(nn.Conv1d(16, 1, kernel_size=7, stride=1)),
+            nn.utils.weight_norm(nn.Conv1d(32, 1, kernel_size=7, stride=1)),
             nn.Tanh(),
         )
 
-    def forward(self, mel):
+    def forward(self, mel, pitch_orig):
         mel = (mel + 5.0) / 5.0 # roughly normalize spectrogram
-        return self.generator(mel)
+        pitch = self.pitch_pred(mel)
+        pre = self.prenet(mel, pitch_orig)
+        return self.generator(pre), pitch
 
     def eval(self, inference=False):
         super(Generator, self).eval()
@@ -106,7 +129,9 @@ class Generator(nn.Module):
         with torch.no_grad():
             pad = torch.full((1, 80, pad_steps), -11.5129).to(mel.device)
             mel = torch.cat((mel, pad), dim=2)
-            audio = self.forward(mel).squeeze()
+            pitch = self.pitch_pred(mel)
+            audio, _ = self.forward(mel, pitch)
+            audio = audio.squeeze()
             audio = audio[:-(256 * pad_steps)]
         return audio
 
@@ -129,9 +154,10 @@ if __name__ == '__main__':
     config = read_config('../configs/melgan_config.yaml')
     model = Generator(80)
     x = torch.randn(3, 80, 1000)
+    pitch = torch.randn(3, 1, 1000)
     start = time.time()
     for i in range(1):
-        y = model(x)
+        y = model(x, pitch)
     dur = time.time() - start
 
     print('dur ', dur)

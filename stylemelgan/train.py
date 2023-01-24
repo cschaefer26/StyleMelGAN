@@ -70,7 +70,7 @@ if __name__ == '__main__':
     train_cfg = config['training']
     dataloader = new_dataloader(data_path=train_data_path, segment_len=train_cfg['segment_len'],
                                 hop_len=audio.hop_length, batch_size=train_cfg['batch_size'],
-                                num_workers=train_cfg['num_workers'], sample_rate=audio.sample_rate)
+                                num_workers=0, sample_rate=audio.sample_rate)
     val_dataset = AudioDataset(data_path=val_data_path, segment_len=None, hop_len=audio.hop_length,
                                sample_rate=audio.sample_rate)
 
@@ -88,8 +88,10 @@ if __name__ == '__main__':
             step += 1
             mel = data['mel'].to(device)
             wav_real = data['wav'].to(device)
+            pitch_orig = data['pitch'].to(device)
 
-            wav_fake = g_model(mel)[:, :, :train_cfg['segment_len']]
+            wav_fake, pitch = g_model(mel, pitch_orig)
+            wav_fake = wav_fake[:, :, :train_cfg['segment_len']]
 
             d_loss = 0.0
             g_loss = 0.0
@@ -116,8 +118,10 @@ if __name__ == '__main__':
 
             factor = 1. if step < pretraining_steps else 0.
 
+            pitch_loss = F.l1_loss(pitch, pitch_orig)
+
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
-            g_loss_all = g_loss + factor * (stft_norm_loss + stft_spec_loss)
+            g_loss_all = g_loss + factor * (stft_norm_loss + stft_spec_loss) + pitch_loss
 
             g_optim.zero_grad()
             g_loss_all.backward()
@@ -126,10 +130,12 @@ if __name__ == '__main__':
             pbar.set_description(desc=f'Epoch: {epoch} | Step {step} '
                                       f'| g_loss: {g_loss:#.4} '
                                       f'| d_loss: {d_loss:#.4} '
+                                      f'| pitch_los: {pitch_loss:#.4} '
                                       f'| stft_norm_loss {stft_norm_loss:#.4} '
                                       f'| stft_spec_loss {stft_spec_loss:#.4} ', refresh=True)
 
             summary_writer.add_scalar('generator_loss', g_loss, global_step=step)
+            summary_writer.add_scalar('pitch_loss', pitch_loss, global_step=step)
             summary_writer.add_scalar('stft_norm_loss', stft_norm_loss, global_step=step)
             summary_writer.add_scalar('stft_spec_loss', stft_spec_loss, global_step=step)
             summary_writer.add_scalar('discriminator_loss', d_loss, global_step=step)

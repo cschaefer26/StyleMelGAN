@@ -1,4 +1,5 @@
 import random
+import numpy as np
 from pathlib import Path
 from typing import Dict, Union
 
@@ -32,14 +33,20 @@ class AudioDataset(Dataset):
         file_id = self.file_ids[item_id]
         mel_path = self.data_path / f'{file_id}.mel'
         wav_path = self.data_path / f'{file_id}.wav'
+        pitch_path = self.data_path / f'{file_id}.pitch'
         wav, _ = librosa.load(wav_path, sr=self.sample_rate)
         wav = torch.tensor(wav).float()
         mel = torch.load(mel_path).squeeze(0)
+        pitch = torch.load(pitch_path).float()
+
         if self.segment_len is not None:
             mel_pad_len = 2 * self.mel_segment_len - mel.size(-1)
             if mel_pad_len > 0:
                 mel_pad = torch.full((mel.size(0), mel_pad_len), fill_value=self.padding_val)
                 mel = torch.cat([mel, mel_pad], dim=-1)
+                pitch_pad = torch.full((mel_pad_len, ), fill_value=0)
+                pitch = torch.cat([pitch, pitch_pad], dim=0)
+
             wav_pad_len = mel.size(-1) * self.hop_len - wav.size(0)
             if wav_pad_len > 0:
                 wav_pad = torch.zeros((wav_pad_len, ))
@@ -52,8 +59,11 @@ class AudioDataset(Dataset):
             wav_end = wav_start + self.segment_len
             wav = wav[wav_start:wav_end]
             wav = wav + (1 / 32768) * torch.randn_like(wav)
-        wav = wav.unsqueeze(0)
-        return {'mel': mel, 'wav': wav}
+            pitch = pitch[mel_start:mel_end]
+
+        pitch = pitch.unsqueeze(0)
+        #print(pitch)
+        return {'mel': mel, 'wav': wav, 'pitch': pitch}
 
 
 def new_dataloader(data_path: Path,
