@@ -60,7 +60,7 @@ class AudioDataset(Dataset):
             wav = wav[wav_start:wav_end]
             wav = wav + (1 / 32768) * torch.randn_like(wav)
             pitch = pitch[mel_start:mel_end]
-
+        wav = wav.unsqueeze(0)
         pitch = pitch.unsqueeze(0)
         #print(pitch)
         return {'mel': mel, 'wav': wav, 'pitch': pitch}
