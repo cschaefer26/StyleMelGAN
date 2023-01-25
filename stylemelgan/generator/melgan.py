@@ -13,6 +13,34 @@ import numpy as np
 MAX_WAV_VALUE = 32768.0
 
 
+class GatedTanh(nn.Module):
+    def __init__(self):
+        super(GatedTanh, self).__init__()
+    def forward(self, x):
+        s, t = x.split(x.size(1) // 2, dim=1)
+        y = torch.sigmoid(s) * torch.tanh(t)
+        return y
+
+
+class GatedTanhWNConv(nn.Module):
+    def __init__(self,
+                 in_channels,
+                 out_channels,
+                 kernel_size,
+                 stride=1,
+                 dilation=1,
+                 padding=0,
+                 groups=1):
+        super(GatedTanhWNConv, self).__init__()
+        self.conv = WNConv1d(in_channels, out_channels*2, kernel_size=kernel_size, stride=stride, padding=padding, dilation=dilation, groups=groups)
+        self.act = GatedTanh()
+
+    def forward(self, x):
+        c = self.conv(x)
+        y = self.act(c)
+        return y
+
+
 
 class ResStack(nn.Module):
     def __init__(self, channel, num_layers=4):
@@ -24,7 +52,7 @@ class ResStack(nn.Module):
                 nn.ReflectionPad1d(3**i),
                 nn.utils.weight_norm(nn.Conv1d(channel, channel, kernel_size=3, dilation=3**i)),
                 nn.LeakyReLU(0.2),
-                nn.utils.weight_norm(nn.Conv1d(channel, channel, kernel_size=1)),
+                GatedTanhWNConv(channel, channel, kernel_size=1),
             )
             for i in range(num_layers)
         ])
@@ -56,17 +84,17 @@ class Generator(nn.Module):
             nn.utils.weight_norm(nn.Conv1d(mel_channel, 512, kernel_size=7, stride=1)),
 
             nn.LeakyReLU(0.2),
-            nn.utils.weight_norm(nn.ConvTranspose1d(512, 512, kernel_size=16, stride=8, padding=4)),
-
-            ResStack(512, num_layers=5),
-
-            nn.LeakyReLU(0.2),
             nn.utils.weight_norm(nn.ConvTranspose1d(512, 256, kernel_size=16, stride=8, padding=4)),
 
             ResStack(256, num_layers=5),
 
             nn.LeakyReLU(0.2),
-            nn.utils.weight_norm(nn.ConvTranspose1d(256, 64, kernel_size=4, stride=2, padding=1)),
+            nn.utils.weight_norm(nn.ConvTranspose1d(256, 128, kernel_size=16, stride=8, padding=4)),
+
+            ResStack(128, num_layers=5),
+
+            nn.LeakyReLU(0.2),
+            nn.utils.weight_norm(nn.ConvTranspose1d(128, 64, kernel_size=4, stride=2, padding=1)),
 
             ResStack(64, num_layers=6),
 
