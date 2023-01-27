@@ -49,17 +49,8 @@ if __name__ == '__main__':
     stats_dataset = AudioDataset(data_path=train_data_path, segment_len=None, hop_len=audio.hop_length,
                                  sample_rate=audio.sample_rate)
 
-    scaler = StandardScaler()
-    for data in tqdm.tqdm(stats_dataset, total=len(stats_dataset)):
-        mel = data['mel']
-        scaler.partial_fit(mel.transpose(1, 0))
 
-    print('mean:')
-    print(scaler.mean_)
-    print('scale:')
-    print(scaler.scale_)
-
-    g_model = Generator(audio.n_mels, scaler.mean_, scaler.scale_).to(device)
+    g_model = Generator(audio.n_mels).to(device)
     d_model = MultiScaleDiscriminator().to(device)
     train_cfg = config['training']
     g_optim = torch.optim.Adam(g_model.parameters(), lr=train_cfg['g_lr'], betas=(0.5, 0.9))
@@ -70,6 +61,7 @@ if __name__ == '__main__':
         g['lr'] = train_cfg['d_lr']
     multires_stft_loss = MultiResStftLoss().to(device)
 
+    print('try to load model.')
     try:
         checkpoint = torch.load(f'checkpoints/latest_model__{model_name}.pt', map_location=device)
         g_model.load_state_dict(checkpoint['g_model'])
@@ -78,8 +70,20 @@ if __name__ == '__main__':
         d_optim.load_state_dict(checkpoint['d_optim'])
         step = checkpoint['step']
         print(f'Loaded model with step {step}')
+        print(f'model mean {g_model.mean} scale {g_model.scale}')
     except Exception as e:
-        'Initializing model from scratch.'
+        print('Initializing model from scratch.')
+        scaler = StandardScaler()
+        for data in tqdm.tqdm(stats_dataset, total=len(stats_dataset)):
+            mel = data['mel']
+            scaler.partial_fit(mel.transpose(1, 0))
+
+        print('mean:')
+        print(scaler.mean_)
+        print('scale:')
+        print(scaler.scale_)
+        g_model.mean = torch.from_numpy(scaler.mean_).float()
+        g_model.scale = torch.from_numpy(scaler.scale_).float()
 
     train_cfg = config['training']
     dataloader = new_dataloader(data_path=train_data_path, segment_len=train_cfg['segment_len'],
