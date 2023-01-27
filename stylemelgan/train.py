@@ -6,6 +6,7 @@ import torch
 import torch.nn.functional as F
 import tqdm
 from matplotlib.figure import Figure
+from sklearn.preprocessing import StandardScaler
 from torch.cuda import is_available
 from torch.utils.tensorboard import SummaryWriter
 
@@ -45,7 +46,15 @@ if __name__ == '__main__':
 
     step = 0
 
-    g_model = Generator(audio.n_mels).to(device)
+    stats_dataset = AudioDataset(data_path=train_data_path, segment_len=None, hop_len=audio.hop_length,
+                                 sample_rate=audio.sample_rate)
+
+    scaler = StandardScaler()
+    for data in tqdm.tqdm(stats_dataset, total=len(stats_dataset)):
+        mel = data['mel']
+        scaler.partial_fit(mel.transpose(1, 0))
+
+    g_model = Generator(audio.n_mels, scaler.mean_, scaler.scale_).to(device)
     d_model = MultiScaleDiscriminator().to(device)
     train_cfg = config['training']
     g_optim = torch.optim.Adam(g_model.parameters(), lr=train_cfg['g_lr'], betas=(0.5, 0.9))
@@ -71,6 +80,8 @@ if __name__ == '__main__':
     dataloader = new_dataloader(data_path=train_data_path, segment_len=train_cfg['segment_len'],
                                 hop_len=audio.hop_length, batch_size=train_cfg['batch_size'],
                                 num_workers=train_cfg['num_workers'], sample_rate=audio.sample_rate)
+
+
     val_dataset = AudioDataset(data_path=val_data_path, segment_len=None, hop_len=audio.hop_length,
                                sample_rate=audio.sample_rate)
 

@@ -47,8 +47,14 @@ class ResStack(nn.Module):
 
 
 class Generator(nn.Module):
-    def __init__(self, mel_channel):
+    def __init__(self, mel_channel, mean, scale):
         super(Generator, self).__init__()
+
+        mean = torch.from_numpy(mean).float().transpose(0, 1).unsqueeze(0)
+        scale = torch.from_numpy(scale).float().transpose(0, 1).unsqueeze(0)
+        self.register_buffer('mean', mean)
+        self.register_buffer('scale', scale)
+
         self.mel_channel = mel_channel
 
         self.generator = nn.Sequential(
@@ -56,24 +62,24 @@ class Generator(nn.Module):
             nn.utils.weight_norm(nn.Conv1d(mel_channel, 512, kernel_size=7, stride=1)),
 
             nn.LeakyReLU(0.2),
-            nn.utils.weight_norm(nn.ConvTranspose1d(512, 512, kernel_size=16, stride=8, padding=4)),
-
-            ResStack(512, num_layers=5),
-
-            nn.LeakyReLU(0.2),
             nn.utils.weight_norm(nn.ConvTranspose1d(512, 256, kernel_size=16, stride=8, padding=4)),
 
             ResStack(256, num_layers=5),
 
             nn.LeakyReLU(0.2),
-            nn.utils.weight_norm(nn.ConvTranspose1d(256, 64, kernel_size=4, stride=2, padding=1)),
+            nn.utils.weight_norm(nn.ConvTranspose1d(256, 128, kernel_size=16, stride=8, padding=4)),
 
-            ResStack(64, num_layers=6),
+            ResStack(128, num_layers=7),
+
+            nn.LeakyReLU(0.2),
+            nn.utils.weight_norm(nn.ConvTranspose1d(128, 64, kernel_size=4, stride=2, padding=1)),
+
+            ResStack(64, num_layers=8),
 
             nn.LeakyReLU(0.2),
             nn.utils.weight_norm(nn.ConvTranspose1d(64, 32, kernel_size=4, stride=2, padding=1)),
 
-            ResStack(32, num_layers=6),
+            ResStack(32, num_layers=9),
 
             nn.LeakyReLU(0.2),
             nn.ReflectionPad1d(3),
@@ -82,7 +88,8 @@ class Generator(nn.Module):
         )
 
     def forward(self, mel):
-        mel = (mel + 5.0) / 5.0 # roughly normalize spectrogram
+        mel = (mel - self.mean) / self.scale
+        #mel = (mel + 5.0) / 5.0 # roughly normalize spectrogram
         return self.generator(mel)
 
     def eval(self, inference=False):
