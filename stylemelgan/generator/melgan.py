@@ -92,7 +92,7 @@ class Generator(nn.Module):
         )
 
     def forward(self, mel):
-        mel = (mel - self.mean[None, :, None]) / self.scale[None, :, None]
+        mel = (mel - self.mean[None, :, None]).to(mel.device) / self.scale[None, :, None].to(mel.device)
         #mel = (mel + 5.0) / 5.0 # roughly normalize spectrogram
         return self.generator(mel)
 
