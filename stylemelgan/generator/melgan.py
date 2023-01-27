@@ -47,13 +47,17 @@ class ResStack(nn.Module):
 
 
 class Generator(nn.Module):
-    def __init__(self, mel_channel, mean, scale):
+    def __init__(self, mel_channel, mean=None, scale=None):
         super(Generator, self).__init__()
 
-        mean = torch.from_numpy(mean).float().transpose(0, 1).unsqueeze(0)
-        scale = torch.from_numpy(scale).float().transpose(0, 1).unsqueeze(0)
-        self.register_buffer('mean', mean)
-        self.register_buffer('scale', scale)
+        self.register_buffer('mean', torch.zeros(80).float())
+        self.register_buffer('scale', torch.zeros(80).float())
+
+        if mean is not None:
+            mean = torch.from_numpy(mean).float()
+            scale = torch.from_numpy(scale).float()
+            self.mean = mean
+            self.scale = scale
 
         self.mel_channel = mel_channel
 
@@ -88,7 +92,7 @@ class Generator(nn.Module):
         )
 
     def forward(self, mel):
-        mel = (mel - self.mean) / self.scale
+        mel = (mel - self.mean[None, :, None]) / self.scale[None, :, None]
         #mel = (mel + 5.0) / 5.0 # roughly normalize spectrogram
         return self.generator(mel)
 

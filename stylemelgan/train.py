@@ -54,6 +54,11 @@ if __name__ == '__main__':
         mel = data['mel']
         scaler.partial_fit(mel.transpose(1, 0))
 
+    print('mean:')
+    print(scaler.mean_)
+    print('scale:')
+    print(scaler.scale_)
+
     g_model = Generator(audio.n_mels, scaler.mean_, scaler.scale_).to(device)
     d_model = MultiScaleDiscriminator().to(device)
     train_cfg = config['training']
