@@ -47,12 +47,16 @@ if __name__ == '__main__':
 
     g_model = Generator(audio.n_mels).to(device)
     d_model = MultiScaleDiscriminator().to(device)
+    d_model_2 = MultiScaleDiscriminator().to(device)
     train_cfg = config['training']
     g_optim = torch.optim.Adam(g_model.parameters(), lr=train_cfg['g_lr'], betas=(0.5, 0.9))
     d_optim = torch.optim.Adam(d_model.parameters(), lr=train_cfg['d_lr'], betas=(0.5, 0.9))
+    d_optim_2 = torch.optim.Adam(d_model_2.parameters(), lr=train_cfg['d_lr'], betas=(0.5, 0.9))
     for g in g_optim.param_groups:
         g['lr'] = train_cfg['g_lr']
     for g in d_optim.param_groups:
+        g['lr'] = train_cfg['d_lr']
+    for g in d_optim_2.param_groups:
         g['lr'] = train_cfg['d_lr']
     multires_stft_loss = MultiResStftLoss().to(device)
 
@@ -62,6 +66,8 @@ if __name__ == '__main__':
         g_optim.load_state_dict(checkpoint['g_optim'])
         d_model.load_state_dict(checkpoint['d_model'])
         d_optim.load_state_dict(checkpoint['d_optim'])
+        d_model_2.load_state_dict(checkpoint['d_model_2'])
+        d_optim_2.load_state_dict(checkpoint['d_optim_2'])
         step = checkpoint['step']
         print(f'Loaded model with step {step}')
     except Exception as e:
@@ -92,6 +98,7 @@ if __name__ == '__main__':
             wav_fake = g_model(mel)[:, :, :train_cfg['segment_len']]
 
             d_loss = 0.0
+            d_loss_2 = 0.0
             g_loss = 0.0
             stft_norm_loss = 0.0
             stft_spec_loss = 0.0
@@ -103,14 +110,30 @@ if __name__ == '__main__':
                 for (_, score_fake), (_, score_real) in zip(d_fake, d_real):
                     d_loss += torch.mean(torch.sum(torch.pow(score_real - 1.0, 2), dim=[1, 2]))
                     d_loss += torch.mean(torch.sum(torch.pow(score_fake, 2), dim=[1, 2]))
+
+                d_fake_2 = d_model_2(wav_fake.detach())
+                d_real_2 = d_model_2(wav_real)
+                for (_, score_fake), (_, score_real) in zip(d_fake_2, d_real_2):
+                    d_loss_2 += F.relu(1. + score_fake).mean()
+                    d_loss_2 += F.relu(1. - score_real).mean()
+
                 d_optim.zero_grad()
                 d_loss.backward()
                 d_optim.step()
+
+                d_optim_2.zero_grad()
+                d_loss_2.backward()
+                d_optim_2.step()
 
                 # generator
                 d_fake = d_model(wav_fake)
                 for (feat_fake, score_fake), (feat_real, _) in zip(d_fake, d_real):
                     g_loss += torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
+                    for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
+                        g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
+
+                for (feat_fake, score_fake), (feat_real, _) in zip(d_fake_2, d_real_2):
+                    g_loss += -score_fake.mean()
                     for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
                         g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
