@@ -133,6 +133,7 @@ if __name__ == '__main__':
                     for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
                         g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
+                d_fake_2 = d_model_2(wav_fake)
                 for (feat_fake, score_fake), (feat_real, _) in zip(d_fake_2, d_real_2):
                     g_loss_2 += -score_fake.mean()
                     for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
