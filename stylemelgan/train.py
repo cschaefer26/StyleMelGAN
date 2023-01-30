@@ -100,6 +100,7 @@ if __name__ == '__main__':
             d_loss = 0.0
             d_loss_2 = 0.0
             g_loss = 0.0
+            g_loss_2 = 0.0
             stft_norm_loss = 0.0
             stft_spec_loss = 0.0
 
@@ -133,29 +134,31 @@ if __name__ == '__main__':
                         g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
                 for (feat_fake, score_fake), (feat_real, _) in zip(d_fake_2, d_real_2):
-                    g_loss += -score_fake.mean()
+                    g_loss_2 += -score_fake.mean()
                     for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
-                        g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
+                        g_loss_2 += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
             factor = 1. if step < pretraining_steps else 0.
 
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
-            g_loss_all = g_loss + factor * (stft_norm_loss + stft_spec_loss)
+            g_loss_all = g_loss + g_loss_2 + factor * (stft_norm_loss + stft_spec_loss)
 
             g_optim.zero_grad()
             g_loss_all.backward()
             g_optim.step()
 
             pbar.set_description(desc=f'Epoch: {epoch} | Step {step} '
-                                      f'| g_loss: {g_loss:#.4} '
+                                      f'| g_loss: {g_loss_all:#.4} '
                                       f'| d_loss: {d_loss:#.4} '
                                       f'| stft_norm_loss {stft_norm_loss:#.4} '
                                       f'| stft_spec_loss {stft_spec_loss:#.4} ', refresh=True)
 
-            summary_writer.add_scalar('generator_loss', g_loss, global_step=step)
+            summary_writer.add_scalar('g_loss', g_loss, global_step=step)
+            summary_writer.add_scalar('g_loss_2', g_loss_2, global_step=step)
             summary_writer.add_scalar('stft_norm_loss', stft_norm_loss, global_step=step)
             summary_writer.add_scalar('stft_spec_loss', stft_spec_loss, global_step=step)
-            summary_writer.add_scalar('discriminator_loss', d_loss, global_step=step)
+            summary_writer.add_scalar('d_loss', d_loss, global_step=step)
+            summary_writer.add_scalar('d_loss_2', d_loss_2, global_step=step)
 
             if step % train_cfg['eval_steps'] == 0:
                 g_model.eval()
@@ -190,6 +193,8 @@ if __name__ == '__main__':
                         'g_optim': g_optim.state_dict(),
                         'd_model': d_model.state_dict(),
                         'd_optim': d_optim.state_dict(),
+                        'd_model_2': d_model_2.state_dict(),
+                        'd_optim_2': d_optim_2.state_dict(),
                         'config': config,
                         'step': step
                     }, f'checkpoints/best_model_{model_name}.pt')
@@ -211,6 +216,8 @@ if __name__ == '__main__':
             'g_optim': g_optim.state_dict(),
             'd_model': d_model.state_dict(),
             'd_optim': d_optim.state_dict(),
+            'd_model_2': d_model.state_dict(),
+            'd_optim_2': d_optim.state_dict(),
             'config': config,
             'step': step
         }, f'checkpoints/latest_model__{model_name}.pt')
