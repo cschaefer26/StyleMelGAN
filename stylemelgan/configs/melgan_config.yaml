@@ -1,5 +1,5 @@
 model_type: 'melgan'
-model_name: 'bild_neurips_nostft'
+model_name: 'bild_aug'
 
 paths:
   train_dir: '/Users/cschaefe/datasets/bild_melgan_small'
@@ -21,7 +21,7 @@ training:
   segment_len: 16384
   g_lr: 0.0001
   d_lr: 0.0001
-  eval_steps: 10000
+  eval_steps: 10
   epochs: 100000
   num_workers: 6
 

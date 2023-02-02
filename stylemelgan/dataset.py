@@ -93,19 +93,18 @@ class AudioDataset(Dataset):
         audio = torch.tensor(wav).float().unsqueeze(0)
         if self.segment_len is not None:
             audio = audio * np.random.uniform(low=0.3, high=1.0)
-
-        if audio.size(1) >= self.segment_len:
-            max_audio_start = audio.size(1) - self.segment_len
-            audio_start = random.randint(0, max_audio_start)
-            audio = audio[:, audio_start:audio_start+self.segment_len]
-        else:
-            audio = torch.nn.functional.pad(audio, (0, self.segment_len - audio.size(1)), 'constant')
+            if audio.size(1) >= self.segment_len:
+                max_audio_start = audio.size(1) - self.segment_len
+                audio_start = random.randint(0, max_audio_start)
+                audio = audio[:, audio_start:audio_start+self.segment_len]
+            else:
+                audio = torch.nn.functional.pad(audio, (0, self.segment_len - audio.size(1)), 'constant')
 
         mel = mel_spectrogram(audio, 1024, 80,
                               22050, 256, 1024, 0, 8000,
                               center=False)
 
-        return {'mel': mel.squeeze(), 'wav': audio.squeeze(0)}
+        return {'mel': mel.squeeze(), 'wav': audio}
 
 
 def new_dataloader(data_path: Path,
