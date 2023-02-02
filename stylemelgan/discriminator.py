@@ -14,40 +14,45 @@ class Identity(nn.Module):
 
 
 class Discriminator(nn.Module):
-
-    def __init__(self, relu_slope: float = 0.2):
+    def __init__(self):
         super(Discriminator, self).__init__()
 
         self.discriminator = nn.ModuleList([
-            Sequential(
-                WNConv1d(1, 16, kernel_size=15, stride=1, padding=7, padding_mode='reflect'),
-                LeakyReLU(relu_slope, inplace=True)
+            nn.Sequential(
+                nn.ReflectionPad1d(7),
+                nn.utils.weight_norm(nn.Conv1d(1, 16, kernel_size=15, stride=1)),
+                nn.LeakyReLU(0.2, inplace=True),
             ),
-            Sequential(
-                WNConv1d(16, 64, kernel_size=41, stride=4, padding=20, groups=4),
-                LeakyReLU(relu_slope, inplace=True)
+            nn.Sequential(
+                nn.utils.weight_norm(nn.Conv1d(16, 64, kernel_size=41, stride=4, padding=20, groups=4)),
+                nn.LeakyReLU(0.2, inplace=True),
             ),
-            Sequential(
-                WNConv1d(64, 256, kernel_size=41, stride=4, padding=20, groups=16),
-                LeakyReLU(relu_slope, inplace=True)
+            nn.Sequential(
+                nn.utils.weight_norm(nn.Conv1d(64, 256, kernel_size=41, stride=4, padding=20, groups=16)),
+                nn.LeakyReLU(0.2, inplace=True),
             ),
-            Sequential(
-                WNConv1d(256, 1024, kernel_size=41, stride=4, padding=20, groups=64),
-                LeakyReLU(relu_slope, inplace=True)
+            nn.Sequential(
+                nn.utils.weight_norm(nn.Conv1d(256, 1024, kernel_size=41, stride=4, padding=20, groups=64)),
+                nn.LeakyReLU(0.2, inplace=True),
             ),
-            Sequential(
-                WNConv1d(1024, 1024, kernel_size=41, stride=4, padding=20, groups=256),
-                LeakyReLU(relu_slope, inplace=True)
+            nn.Sequential(
+                nn.utils.weight_norm(nn.Conv1d(1024, 1024, kernel_size=41, stride=4, padding=20, groups=256)),
+                nn.LeakyReLU(0.2, inplace=True),
             ),
-            Sequential(
-                WNConv1d(1024, 1024, kernel_size=5, stride=1, padding=2),
-                LeakyReLU(relu_slope, inplace=True)
+            nn.Sequential(
+                nn.utils.weight_norm(nn.Conv1d(1024, 1024, kernel_size=5, stride=1, padding=2)),
+                nn.LeakyReLU(0.2, inplace=True),
             ),
-            WNConv1d(1024, 1, kernel_size=3, stride=1, padding=1)
+            nn.utils.weight_norm(nn.Conv1d(1024, 1, kernel_size=3, stride=1, padding=1)),
         ])
 
     def forward(self, x):
-        features = []
+        '''
+            returns: (list of 6 features, discriminator score)
+            we directly predict score without last sigmoid function
+            since we're using Least Squares GAN (https://arxiv.org/abs/1611.04076)
+        '''
+        features = list()
         for module in self.discriminator:
             x = module(x)
             features.append(x)
