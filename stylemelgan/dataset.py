@@ -5,6 +5,7 @@ from librosa.filters import mel as librosa_mel_fn
 import librosa
 import torch
 import numpy as np
+from librosa.util import normalize
 
 from torch.utils.data import Dataset, DataLoader
 
@@ -90,9 +91,10 @@ class AudioDataset(Dataset):
         file_id = self.file_ids[item_id]
         wav_path = self.data_path / f'{file_id}.wav'
         wav, _ = librosa.load(wav_path, sr=self.sample_rate)
+        wav = 0.95 * normalize(wav)
         audio = torch.tensor(wav).float().unsqueeze(0)
         if self.segment_len is not None:
-            audio = audio * np.random.uniform(low=0.3, high=1.0)
+            audio = audio * float(np.random.uniform(low=0.3, high=1.0))
             if audio.size(1) >= self.segment_len:
                 max_audio_start = audio.size(1) - self.segment_len
                 audio_start = random.randint(0, max_audio_start)
