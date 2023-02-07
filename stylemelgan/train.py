@@ -11,7 +11,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from stylemelgan.audio import Audio
 from stylemelgan.dataset import new_dataloader, AudioDataset
-from stylemelgan.discriminator import MultiScaleDiscriminator
+from stylemelgan.discriminator import MultiScaleDiscriminator, PitchPredictor
 from stylemelgan.generator.melgan import Generator
 from stylemelgan.losses import stft, MultiResStftLoss
 from stylemelgan.utils import read_config
@@ -47,9 +47,11 @@ if __name__ == '__main__':
 
     g_model = Generator(audio.n_mels).to(device)
     d_model = MultiScaleDiscriminator().to(device)
+    p_model = PitchPredictor().to(device)
     train_cfg = config['training']
     g_optim = torch.optim.Adam(g_model.parameters(), lr=train_cfg['g_lr'], betas=(0.5, 0.9))
     d_optim = torch.optim.Adam(d_model.parameters(), lr=train_cfg['d_lr'], betas=(0.5, 0.9))
+    p_optim = torch.optim.Adam(p_model.parameters(), lr=train_cfg['d_lr'], betas=(0.5, 0.9))
     for g in g_optim.param_groups:
         g['lr'] = train_cfg['g_lr']
     for g in d_optim.param_groups:
@@ -62,6 +64,8 @@ if __name__ == '__main__':
         g_optim.load_state_dict(checkpoint['g_optim'])
         d_model.load_state_dict(checkpoint['d_model'])
         d_optim.load_state_dict(checkpoint['d_optim'])
+        p_model.load_state_dict(checkpoint['p_model'])
+        p_optim.load_state_dict(checkpoint['p_optim'])
         step = checkpoint['step']
         print(f'Loaded model with step {step}')
     except Exception as e:
@@ -97,6 +101,13 @@ if __name__ == '__main__':
             g_loss = 0.0
             stft_norm_loss = 0.0
             stft_spec_loss = 0.0
+            pitch_loss_fake = 0.0
+
+            p_real = p_model(wav_real)
+            pitch_loss_real = F.l1_loss(p_real, pitch_orig)
+            p_optim.zero_grad()
+            pitch_loss_real.backward()
+            p_optim.step()
 
             if step > pretraining_steps:
                 # discriminator
@@ -116,12 +127,14 @@ if __name__ == '__main__':
                     for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
                         g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
+                p_fake = p_model(wav_fake)
+                pitch_loss_fake = F.l1_loss(p_fake, pitch_orig)
+                g_loss += pitch_loss_fake
+
             factor = 1. if step < pretraining_steps else 0.
 
-            pitch_loss = F.l1_loss(pitch, pitch_orig)
-
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
-            g_loss_all = g_loss + factor * (stft_norm_loss + stft_spec_loss) + pitch_loss
+            g_loss_all = g_loss + factor * (stft_norm_loss + stft_spec_loss) + pitch_loss_fake
 
             g_optim.zero_grad()
             g_loss_all.backward()
@@ -130,12 +143,13 @@ if __name__ == '__main__':
             pbar.set_description(desc=f'Epoch: {epoch} | Step {step} '
                                       f'| g_loss: {g_loss:#.4} '
                                       f'| d_loss: {d_loss:#.4} '
-                                      f'| pitch_loss: {pitch_loss:#.4} '
+                                      f'| pitch_loss: {pitch_loss_real:#.4} '
                                       f'| stft_norm_loss {stft_norm_loss:#.4} '
                                       f'| stft_spec_loss {stft_spec_loss:#.4} ', refresh=True)
 
             summary_writer.add_scalar('generator_loss', g_loss, global_step=step)
-            summary_writer.add_scalar('pitch_loss', pitch_loss, global_step=step)
+            summary_writer.add_scalar('pitch_loss_real', pitch_loss_real, global_step=step)
+            summary_writer.add_scalar('pitch_loss_fake', pitch_loss_fake, global_step=step)
             summary_writer.add_scalar('stft_norm_loss', stft_norm_loss, global_step=step)
             summary_writer.add_scalar('stft_spec_loss', stft_spec_loss, global_step=step)
             summary_writer.add_scalar('discriminator_loss', d_loss, global_step=step)

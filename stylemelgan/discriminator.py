@@ -13,6 +13,46 @@ class Identity(nn.Module):
         return x
 
 
+
+class PitchPredictor(nn.Module):
+
+    def __init__(self, relu_slope: float = 0.2):
+        super(PitchPredictor, self).__init__()
+
+        self.discriminator = nn.ModuleList([
+            Sequential(
+                WNConv1d(1, 16, kernel_size=15, stride=1, padding=7, padding_mode='reflect'),
+                LeakyReLU(relu_slope, inplace=True)
+            ),
+            Sequential(
+                WNConv1d(16, 64, kernel_size=41, stride=4, padding=20, groups=4),
+                LeakyReLU(relu_slope, inplace=True)
+            ),
+            Sequential(
+                WNConv1d(64, 256, kernel_size=41, stride=4, padding=20, groups=16),
+                LeakyReLU(relu_slope, inplace=True)
+            ),
+            Sequential(
+                WNConv1d(256, 1024, kernel_size=41, stride=4, padding=20, groups=64),
+                LeakyReLU(relu_slope, inplace=True)
+            ),
+            Sequential(
+                WNConv1d(1024, 1024, kernel_size=41, stride=4, padding=20, groups=256),
+                LeakyReLU(relu_slope, inplace=True)
+            ),
+            Sequential(
+                WNConv1d(1024, 1024, kernel_size=5, stride=1, padding=2),
+                LeakyReLU(relu_slope, inplace=True)
+            ),
+            WNConv1d(1024, 1, kernel_size=3, stride=1, padding=1)
+        ])
+
+    def forward(self, x):
+        for module in self.discriminator:
+            x = module(x)
+        return x
+
+
 class Discriminator(nn.Module):
 
     def __init__(self, relu_slope: float = 0.2):

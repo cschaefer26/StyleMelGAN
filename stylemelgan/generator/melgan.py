@@ -46,38 +46,15 @@ class ResStack(nn.Module):
             nn.utils.remove_weight_norm(shortcut)
 
 
-class Prenet(nn.Module):
-
-    def __init__(self, dims=512):
-        super(Prenet, self).__init__()
-        self.pitch_conv = nn.Conv1d(1, dims, kernel_size=3, padding=1)
-        self.pre_conv = nn.Sequential(
-            nn.ReflectionPad1d(3),
-            nn.utils.weight_norm(nn.Conv1d(80, dims, kernel_size=7, stride=1))
-        )
-
-    def forward(self, mel, pitch):
-        pre = self.pre_conv(mel)
-        pitch = self.pitch_conv(pitch)
-        return pre + pitch
-
-
-
 class Generator(nn.Module):
     def __init__(self, mel_channel):
         super(Generator, self).__init__()
         self.mel_channel = mel_channel
 
-        self.pitch_pred = nn.Sequential(
-            nn.ReflectionPad1d(3),
-            nn.utils.weight_norm(nn.Conv1d(mel_channel, 256, kernel_size=7, stride=1)),
-            nn.ReLU(),
-            nn.utils.weight_norm(nn.Conv1d(256, 1, kernel_size=1, stride=1)),
-        )
-
-        self.prenet = Prenet(512)
-
         self.generator = nn.Sequential(
+            nn.ReflectionPad1d(3),
+            nn.utils.weight_norm(nn.Conv1d(mel_channel, 512, kernel_size=7, stride=1)),
+
             nn.LeakyReLU(0.2),
             nn.utils.weight_norm(nn.ConvTranspose1d(512, 256, kernel_size=16, stride=8, padding=4)),
 
@@ -104,11 +81,9 @@ class Generator(nn.Module):
             nn.Tanh(),
         )
 
-    def forward(self, mel, pitch_orig):
+    def forward(self, mel):
         mel = (mel + 5.0) / 5.0 # roughly normalize spectrogram
-        pitch = self.pitch_pred(mel)
-        pre = self.prenet(mel, pitch_orig)
-        return self.generator(pre), pitch
+        return self.generator(mel)
 
     def eval(self, inference=False):
         super(Generator, self).eval()
@@ -131,16 +106,14 @@ class Generator(nn.Module):
         with torch.no_grad():
             pad = torch.full((1, 80, pad_steps), -11.5129).to(mel.device)
             mel = torch.cat((mel, pad), dim=2)
-            pitch = self.pitch_pred(mel)
-            audio, _ = self.forward(mel, pitch)
-            audio = audio.squeeze()
+            audio = self.forward(mel).squeeze()
             audio = audio[:-(256 * pad_steps)]
         return audio
 
     @classmethod
     def from_config(cls, config: Dict[str, Any]) -> 'Generator':
         return Generator(mel_channels=config['audio']['n_mels'],
-                               **config['model'])
+                         **config['model'])
 
     @classmethod
     def from_checkpoint(cls, file: str) -> 'Generator':
@@ -156,10 +129,9 @@ if __name__ == '__main__':
     config = read_config('../configs/melgan_config.yaml')
     model = Generator(80)
     x = torch.randn(3, 80, 1000)
-    pitch = torch.randn(3, 1, 1000)
     start = time.time()
     for i in range(1):
-        y = model(x, pitch)
+        y = model(x)
     dur = time.time() - start
 
     print('dur ', dur)
