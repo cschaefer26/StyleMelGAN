@@ -94,7 +94,7 @@ if __name__ == '__main__':
             wav_real = data['wav'].to(device)
             pitch_orig = data['pitch'].to(device)
 
-            wav_fake, pitch = g_model(mel)
+            wav_fake = g_model(mel)
             wav_fake = wav_fake[:, :, :train_cfg['segment_len']]
 
             d_loss = 0.0
