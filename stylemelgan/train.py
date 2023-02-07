@@ -129,7 +129,6 @@ if __name__ == '__main__':
 
                 p_fake = p_model(wav_fake)
                 pitch_loss_fake = F.l1_loss(p_fake, pitch_orig)
-                g_loss += pitch_loss_fake
 
             factor = 1. if step < pretraining_steps else 0.
 
