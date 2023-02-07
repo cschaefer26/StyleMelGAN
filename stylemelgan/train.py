@@ -94,7 +94,7 @@ if __name__ == '__main__':
             wav_real = data['wav'].to(device)
             pitch_orig = data['pitch'].to(device)
 
-            wav_fake, pitch = g_model(mel, pitch_orig)
+            wav_fake, pitch = g_model(mel)
             wav_fake = wav_fake[:, :, :train_cfg['segment_len']]
 
             d_loss = 0.0
@@ -187,6 +187,8 @@ if __name__ == '__main__':
                         'g_optim': g_optim.state_dict(),
                         'd_model': d_model.state_dict(),
                         'd_optim': d_optim.state_dict(),
+                        'p_model': p_model.state_dict(),
+                        'p_optim': p_optim.state_dict(),
                         'config': config,
                         'step': step
                     }, f'checkpoints/best_model_{model_name}.pt')
@@ -208,6 +210,8 @@ if __name__ == '__main__':
             'g_optim': g_optim.state_dict(),
             'd_model': d_model.state_dict(),
             'd_optim': d_optim.state_dict(),
+            'p_model': p_model.state_dict(),
+            'p_optim': p_optim.state_dict(),
             'config': config,
             'step': step
         }, f'checkpoints/latest_model__{model_name}.pt')
