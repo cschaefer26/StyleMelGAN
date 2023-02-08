@@ -10,7 +10,7 @@ from torch.cuda import is_available
 from torch.utils.tensorboard import SummaryWriter
 
 from stylemelgan.audio import Audio
-from stylemelgan.dataset import new_dataloader, AudioDataset
+from stylemelgan.dataset import new_dataloader, AudioDataset, mel_spectrogram
 from stylemelgan.discriminator import MultiScaleDiscriminator
 from stylemelgan.generator.melgan import Generator
 from stylemelgan.losses import stft, MultiResStftLoss
@@ -116,8 +116,12 @@ if __name__ == '__main__':
 
             factor = 1. if step < pretraining_steps else 0.
 
-            stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
-            g_loss_all = g_loss + factor * (stft_norm_loss + stft_spec_loss)
+            mel_fake = mel_spectrogram(wav_fake.squeeze(1), 1024, 80,
+                                                     22050, 256, 1024, 0, 8000,
+                                                     center=False)
+            #stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
+            mel_loss = F.l1_loss(mel_fake, mel)
+            g_loss_all = g_loss + factor * 45 * mel_loss
 
             g_optim.zero_grad()
             g_loss_all.backward()
@@ -130,8 +134,7 @@ if __name__ == '__main__':
                                       f'| stft_spec_loss {stft_spec_loss:#.4} ', refresh=True)
 
             summary_writer.add_scalar('generator_loss', g_loss, global_step=step)
-            summary_writer.add_scalar('stft_norm_loss', stft_norm_loss, global_step=step)
-            summary_writer.add_scalar('stft_spec_loss', stft_spec_loss, global_step=step)
+            summary_writer.add_scalar('mel_loss', mel_loss, global_step=step)
             summary_writer.add_scalar('discriminator_loss', d_loss, global_step=step)
 
             if step % train_cfg['eval_steps'] == 0:
