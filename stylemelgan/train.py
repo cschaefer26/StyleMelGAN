@@ -98,16 +98,11 @@ if __name__ == '__main__':
             wav_fake = wav_fake[:, :, :train_cfg['segment_len']]
 
             d_loss = 0.0
+            p_loss = 0.0
             g_loss = 0.0
             stft_norm_loss = 0.0
             stft_spec_loss = 0.0
             pitch_loss_fake = 0.0
-
-            p_real = p_model(wav_real)
-            pitch_loss_real = F.l1_loss(p_real, pitch_orig)
-            p_optim.zero_grad()
-            pitch_loss_real.backward()
-            p_optim.step()
 
             if step > pretraining_steps:
                 # discriminator
@@ -120,6 +115,16 @@ if __name__ == '__main__':
                 d_loss.backward()
                 d_optim.step()
 
+                # discriminator p
+                p_fake = p_model(wav_fake.detach())
+                p_real = p_model(wav_real)
+                for (_, score_fake), (_, score_real) in zip(p_fake, p_real):
+                    p_loss += torch.mean(torch.sum(torch.pow(score_real - 1.0, 2), dim=[1]))
+                    p_loss += torch.mean(torch.sum(torch.pow(score_fake, 2), dim=[1]))
+                p_optim.zero_grad()
+                p_loss.backward()
+                p_optim.step()
+
                 # generator
                 d_fake = d_model(wav_fake)
                 for (feat_fake, score_fake), (feat_real, _) in zip(d_fake, d_real):
@@ -127,13 +132,17 @@ if __name__ == '__main__':
                     for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
                         g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
+                # generator p
                 p_fake = p_model(wav_fake)
-                pitch_loss_fake = F.l1_loss(p_fake, pitch_orig)
+                for (feat_fake, score_fake), (feat_real, _) in zip(p_fake, p_real):
+                    g_loss += torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1]))
+                    for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
+                        g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
             factor = 1. if step < pretraining_steps else 0.
 
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
-            g_loss_all = g_loss + factor * (stft_norm_loss + stft_spec_loss) + pitch_loss_fake
+            g_loss_all = g_loss + factor * (stft_norm_loss + stft_spec_loss)
 
             g_optim.zero_grad()
             g_loss_all.backward()
@@ -142,16 +151,14 @@ if __name__ == '__main__':
             pbar.set_description(desc=f'Epoch: {epoch} | Step {step} '
                                       f'| g_loss: {g_loss:#.4} '
                                       f'| d_loss: {d_loss:#.4} '
-                                      f'| pitch_loss: {pitch_loss_real:#.4} '
                                       f'| stft_norm_loss {stft_norm_loss:#.4} '
                                       f'| stft_spec_loss {stft_spec_loss:#.4} ', refresh=True)
 
             summary_writer.add_scalar('generator_loss', g_loss, global_step=step)
-            summary_writer.add_scalar('pitch_loss_real', pitch_loss_real, global_step=step)
-            summary_writer.add_scalar('pitch_loss_fake', pitch_loss_fake, global_step=step)
             summary_writer.add_scalar('stft_norm_loss', stft_norm_loss, global_step=step)
             summary_writer.add_scalar('stft_spec_loss', stft_spec_loss, global_step=step)
-            summary_writer.add_scalar('discriminator_loss', d_loss, global_step=step)
+            summary_writer.add_scalar('d_loss', d_loss, global_step=step)
+            summary_writer.add_scalar('p_loss', p_loss, global_step=step)
 
             if step % train_cfg['eval_steps'] == 0:
                 g_model.eval()
