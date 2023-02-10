@@ -11,7 +11,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from stylemelgan.audio import Audio
 from stylemelgan.dataset import new_dataloader, AudioDataset
-from stylemelgan.discriminator import MultiScaleDiscriminator, PitchPredictor, MultiPeriodDiscriminator
+from stylemelgan.discriminator import MultiScaleDiscriminator,  MultiPeriodDiscriminator
 from stylemelgan.generator.melgan import Generator
 from stylemelgan.losses import stft, MultiResStftLoss
 from stylemelgan.utils import read_config
@@ -92,7 +92,6 @@ if __name__ == '__main__':
             step += 1
             mel = data['mel'].to(device)
             wav_real = data['wav'].to(device)
-            pitch_orig = data['pitch'][:, :, :train_cfg['segment_len']//256].to(device)
 
             wav_fake = g_model(mel)
             wav_fake = wav_fake[:, :, :train_cfg['segment_len']]
@@ -102,7 +101,6 @@ if __name__ == '__main__':
             g_loss = 0.0
             stft_norm_loss = 0.0
             stft_spec_loss = 0.0
-            pitch_loss_fake = 0.0
 
             if step > pretraining_steps:
                 # discriminator
