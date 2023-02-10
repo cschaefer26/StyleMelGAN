@@ -54,14 +54,10 @@ class ResStack(nn.Module):
             for i in range(num_layers)
         ])
 
-        self.shortcuts = nn.ModuleList([
-            nn.utils.weight_norm(nn.Conv1d(channel, channel, kernel_size=1))
-            for i in range(num_layers)
-        ])
 
     def forward(self, x):
-        for b1, b2, b3, shortcut in zip(self.blocks_1, self.blocks_2, self.blocks_3, self.shortcuts):
-            x = shortcut(x) + 1./3. * (b1(x) + b2(x) + b3(x))
+        for b1, b2, b3 in zip(self.blocks_1, self.blocks_2, self.blocks_3):
+            x = x + 1./3. * (b1(x) + b2(x) + b3(x))
         return x
 
     def remove_weight_norm(self):
