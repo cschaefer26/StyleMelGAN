@@ -13,16 +13,41 @@ import numpy as np
 MAX_WAV_VALUE = 32768.0
 
 
+def get_padding(kernel_size, dilation=1):
+    return int((kernel_size*dilation - dilation)/2)
+
 
 class ResStack(nn.Module):
     def __init__(self, channel, num_layers=4):
         super(ResStack, self).__init__()
 
-        self.blocks = nn.ModuleList([
+        self.blocks_1 = nn.ModuleList([
             nn.Sequential(
                 nn.LeakyReLU(0.2),
-                nn.ReflectionPad1d(3**i),
+                nn.ReflectionPad1d(get_padding(3, 3**i)),
                 nn.utils.weight_norm(nn.Conv1d(channel, channel, kernel_size=3, dilation=3**i)),
+                nn.LeakyReLU(0.2),
+                nn.utils.weight_norm(nn.Conv1d(channel, channel, kernel_size=1)),
+            )
+            for i in range(num_layers)
+        ])
+
+        self.blocks_2 = nn.ModuleList([
+            nn.Sequential(
+                nn.LeakyReLU(0.2),
+                nn.ReflectionPad1d(get_padding(7, 3**i)),
+                nn.utils.weight_norm(nn.Conv1d(channel, channel, kernel_size=7, dilation=3**i)),
+                nn.LeakyReLU(0.2),
+                nn.utils.weight_norm(nn.Conv1d(channel, channel, kernel_size=1)),
+            )
+            for i in range(num_layers)
+        ])
+
+        self.blocks_3 = nn.ModuleList([
+            nn.Sequential(
+                nn.LeakyReLU(0.2),
+                nn.ReflectionPad1d(get_padding(11, 3**i)),
+                nn.utils.weight_norm(nn.Conv1d(channel, channel, kernel_size=11, dilation=3**i)),
                 nn.LeakyReLU(0.2),
                 nn.utils.weight_norm(nn.Conv1d(channel, channel, kernel_size=1)),
             )
@@ -35,12 +60,12 @@ class ResStack(nn.Module):
         ])
 
     def forward(self, x):
-        for block, shortcut in zip(self.blocks, self.shortcuts):
-            x = shortcut(x) + block(x)
+        for b1, b2, b3, shortcut in zip(self.blocks_1, self.blocks_2, self.blocks_3, self.shortcuts):
+            x = shortcut(x) + 1./3. * (b1(x) + b2(x) + b3(x))
         return x
 
     def remove_weight_norm(self):
-        for block, shortcut in zip(self.blocks, self.shortcuts):
+        for block, shortcut in zip(self.blocks_1, self.blocks_2, self.blocks_3, self.shortcuts):
             nn.utils.remove_weight_norm(block[2])
             nn.utils.remove_weight_norm(block[4])
             nn.utils.remove_weight_norm(shortcut)
@@ -53,31 +78,31 @@ class Generator(nn.Module):
 
         self.generator = nn.Sequential(
             nn.ReflectionPad1d(3),
-            nn.utils.weight_norm(nn.Conv1d(mel_channel, 512, kernel_size=7, stride=1)),
-
-            nn.LeakyReLU(0.2),
-            nn.utils.weight_norm(nn.ConvTranspose1d(512, 256, kernel_size=16, stride=8, padding=4)),
-
-            ResStack(256, num_layers=5),
+            nn.utils.weight_norm(nn.Conv1d(mel_channel, 256, kernel_size=7, stride=1)),
 
             nn.LeakyReLU(0.2),
             nn.utils.weight_norm(nn.ConvTranspose1d(256, 128, kernel_size=16, stride=8, padding=4)),
 
-            ResStack(128, num_layers=7),
+            ResStack(128, num_layers=3),
 
             nn.LeakyReLU(0.2),
-            nn.utils.weight_norm(nn.ConvTranspose1d(128, 64, kernel_size=4, stride=2, padding=1)),
+            nn.utils.weight_norm(nn.ConvTranspose1d(128, 64, kernel_size=16, stride=8, padding=4)),
 
-            ResStack(64, num_layers=8),
+            ResStack(64, num_layers=3),
 
             nn.LeakyReLU(0.2),
             nn.utils.weight_norm(nn.ConvTranspose1d(64, 32, kernel_size=4, stride=2, padding=1)),
 
-            ResStack(32, num_layers=9),
+            ResStack(32, num_layers=4),
+
+            nn.LeakyReLU(0.2),
+            nn.utils.weight_norm(nn.ConvTranspose1d(32, 16, kernel_size=4, stride=2, padding=1)),
+
+            ResStack(16, num_layers=5),
 
             nn.LeakyReLU(0.2),
             nn.ReflectionPad1d(3),
-            nn.utils.weight_norm(nn.Conv1d(32, 1, kernel_size=7, stride=1)),
+            nn.utils.weight_norm(nn.Conv1d(16, 1, kernel_size=7, stride=1)),
             nn.Tanh(),
         )
 
