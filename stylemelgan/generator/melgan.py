@@ -51,39 +51,68 @@ class Generator(nn.Module):
         super(Generator, self).__init__()
         self.mel_channel = mel_channel
 
-        self.generator = nn.Sequential(
-            nn.ReflectionPad1d(3),
-            nn.utils.weight_norm(nn.Conv1d(mel_channel, 512, kernel_size=7, stride=1)),
+        self.pad_pre = nn.ReflectionPad1d(3)
+        self.conv_pre = nn.utils.weight_norm(nn.Conv1d(mel_channel, 512, kernel_size=7, stride=1))
+        self.relu_1 = nn.LeakyReLU(0.2)
+        self.trans_1 = nn.utils.weight_norm(nn.ConvTranspose1d(512, 256, kernel_size=16, stride=8, padding=4))
 
-            nn.LeakyReLU(0.2),
-            nn.utils.weight_norm(nn.ConvTranspose1d(512, 256, kernel_size=16, stride=8, padding=4)),
+        self.res_1 = ResStack(256, num_layers=5)
+        self.relu_2 = nn.LeakyReLU(0.2)
+        self.trans_2 = nn.utils.weight_norm(nn.ConvTranspose1d(256, 128-16, kernel_size=16, stride=8, padding=4))
+        self.trans_skip_2 = nn.utils.weight_norm(nn.ConvTranspose1d(mel_channel, 16, kernel_size=128, stride=64, padding=32))
 
-            ResStack(256, num_layers=5),
+        self.res_2 = ResStack(128, num_layers=7)
+        self.relu_3 = nn.LeakyReLU(0.2)
+        self.trans_3 = nn.utils.weight_norm(nn.ConvTranspose1d(128, 64-8, kernel_size=4, stride=2, padding=1))
+        self.trans_skip_3 = nn.utils.weight_norm(nn.ConvTranspose1d(mel_channel, 8, kernel_size=256, stride=128, padding=64))
 
-            nn.LeakyReLU(0.2),
-            nn.utils.weight_norm(nn.ConvTranspose1d(256, 128, kernel_size=16, stride=8, padding=4)),
-
-            ResStack(128, num_layers=7),
-
-            nn.LeakyReLU(0.2),
-            nn.utils.weight_norm(nn.ConvTranspose1d(128, 64, kernel_size=4, stride=2, padding=1)),
-
-            ResStack(64, num_layers=8),
-
-            nn.LeakyReLU(0.2),
-            nn.utils.weight_norm(nn.ConvTranspose1d(64, 32, kernel_size=4, stride=2, padding=1)),
-
-            ResStack(32, num_layers=9),
-
-            nn.LeakyReLU(0.2),
-            nn.ReflectionPad1d(3),
-            nn.utils.weight_norm(nn.Conv1d(32, 1, kernel_size=7, stride=1)),
-            nn.Tanh(),
-        )
+        self.res_3 = ResStack(64, num_layers=8)
+        self.relu_4 = nn.LeakyReLU(0.2)
+        self.trans_4 = nn.utils.weight_norm(nn.ConvTranspose1d(64, 32-4, kernel_size=4, stride=2, padding=1))
+        self.trans_skip_4 = nn.utils.weight_norm(nn.ConvTranspose1d(mel_channel, 4, kernel_size=512, stride=256, padding=128))
+        self.res_4 = ResStack(32, num_layers=9)
+        self.relu_5 = nn.LeakyReLU(0.2)
+        self.pad_post = nn.ReflectionPad1d(3)
+        self.conv_post = nn.utils.weight_norm(nn.Conv1d(32, 1, kernel_size=7, stride=1))
+        self.tanh = nn.Tanh()
 
     def forward(self, mel):
-        mel = (mel + 5.0) / 5.0 # roughly normalize spectrogram
-        return self.generator(mel)
+        x = (mel + 5.0) / 5.0 # roughly normalize spectrogram
+        x = self.pad_pre(x)
+        x = self.conv_pre(x)
+        x = self.relu_1(x)
+        x = self.trans_1(x)
+        x = self.res_1(x)
+        x = self.relu_2(x)
+
+        x = self.trans_2(x)
+        x_skip = self.trans_skip_2(mel)
+        x = torch.cat([x, x_skip], dim=1)
+
+        x = self.res_2(x)
+        x = self.relu_3(x)
+
+        x = self.trans_3(x)
+        x_skip = self.trans_skip_3(mel)
+        x = torch.cat([x, x_skip], dim=1)
+
+        x = self.res_3(x)
+        x = self.relu_4(x)
+
+        x = self.trans_4(x)
+        x_skip = self.trans_skip_4(mel)
+        x = torch.cat([x, x_skip], dim=1)
+
+        x = self.res_4(x)
+        x = self.relu_5(x)
+        x = self.pad_post(x)
+        x = self.conv_post(x)
+        x = self.tanh(x)
+        return x
+        
+        
+        
+        return x      
 
     def eval(self, inference=False):
         super(Generator, self).eval()
