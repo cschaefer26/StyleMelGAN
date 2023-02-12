@@ -56,6 +56,8 @@ if __name__ == '__main__':
         g['lr'] = train_cfg['g_lr']
     for g in d_optim.param_groups:
         g['lr'] = train_cfg['d_lr']
+    for g in p_optim.param_groups:
+        g['lr'] = train_cfg['d_lr']
     multires_stft_loss = MultiResStftLoss().to(device)
 
     try:
