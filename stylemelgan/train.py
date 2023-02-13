@@ -119,8 +119,8 @@ if __name__ == '__main__':
                 p_fake = p_model(wav_fake.detach())
                 p_real = p_model(wav_real)
                 for (_, score_fake), (_, score_real) in zip(p_fake, p_real):
-                    p_loss += torch.mean(torch.pow(score_real - 1.0, 2), dim=[1])
-                    p_loss += torch.mean(torch.pow(score_fake, 2), dim=[1])
+                    p_loss += torch.mean(torch.pow(score_real - 1.0, 2))
+                    p_loss += torch.mean(torch.pow(score_fake, 2))
                 p_optim.zero_grad()
                 p_loss.backward()
                 p_optim.step()
@@ -135,7 +135,7 @@ if __name__ == '__main__':
                 # generator p
                 p_fake = p_model(wav_fake)
                 for (feat_fake, score_fake), (feat_real, _) in zip(p_fake, p_real):
-                    g_loss += torch.mean(torch.pow(score_fake - 1.0, 2), dim=[1])
+                    g_loss += torch.mean(torch.pow(score_fake - 1.0, 2))
                     for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
                         g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
