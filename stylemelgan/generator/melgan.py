@@ -58,9 +58,13 @@ class ResStack(nn.Module):
 
     def forward(self, x):
         x_res = self.shortcut(x)
+        xs = None
         for block in self.blocks:
-            x = x + block(x)
-        return x_res + x / len(self.blocks)
+            if xs is None:
+                xs = block(x)
+            else:
+                xs += block(x)
+        return x_res + xs / len(self.blocks)
 
     def remove_weight_norm(self):
         for block, shortcut in zip(self.blocks, self.shortcuts):
