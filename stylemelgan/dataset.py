@@ -74,7 +74,7 @@ class AudioDataset(Dataset):
                  segment_len: Union[int, None],
                  sample_rate: int,
                  padding_val: float = -11.5129) -> None:
-        mel_names = list(data_path.glob('**/*.mel'))
+        mel_names = list(data_path.glob('**/*.npy'))
         self.data_path = data_path
         self.hop_len = hop_len
         self.segment_len = segment_len
