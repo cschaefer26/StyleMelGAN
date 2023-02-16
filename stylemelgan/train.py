@@ -140,7 +140,7 @@ if __name__ == '__main__':
                 val_spec_loss = 0
                 val_wavs = []
 
-                for i, val_data in enumerate(val_dataset):
+                for i, val_data in tqdm.tqdm(enumerate(val_dataset), total=len(val_dataset)):
                     val_mel = val_data['mel'].to(device)
                     val_mel = val_mel.unsqueeze(0)
                     wav_fake = g_model.inference(val_mel).squeeze().cpu().numpy()
