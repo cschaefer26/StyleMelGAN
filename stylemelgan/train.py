@@ -148,7 +148,7 @@ if __name__ == '__main__':
                     val_mel = val_data['mel'].to(device)
                     with torch.no_grad():
                         wav_f = g_model(val_mel).squeeze(0)
-                    wav_r = val_data['wav'].squeeze(0)
+                    wav_r = val_data['wav'].squeeze(0).to(device)
                     #wav_f = torch.tensor(wav_fake).unsqueeze(0).to(device)
                     #wav_r = torch.tensor(wav_real).unsqueeze(0).to(device)
                     size = min(wav_r.size(-1), wav_f.size(-1))
