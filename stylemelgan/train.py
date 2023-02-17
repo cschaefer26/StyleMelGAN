@@ -71,6 +71,9 @@ if __name__ == '__main__':
     dataloader = new_dataloader(data_path=train_data_path, segment_len=train_cfg['segment_len'],
                                 hop_len=audio.hop_length, batch_size=train_cfg['batch_size'],
                                 num_workers=train_cfg['num_workers'], sample_rate=audio.sample_rate)
+    val_dataloader = new_dataloader(data_path=train_data_path, segment_len=None,
+                                    hop_len=audio.hop_length, batch_size=1,
+                                    num_workers=train_cfg['num_workers'], sample_rate=audio.sample_rate)
     val_dataset = AudioDataset(data_path=val_data_path, segment_len=None, hop_len=audio.hop_length,
                                sample_rate=audio.sample_rate)
 
@@ -138,27 +141,28 @@ if __name__ == '__main__':
                 g_model.eval()
                 val_norm_loss = 0
                 val_spec_loss = 0
-                val_wavs = []
+                val_wav_r = None
+                val_wav_f = None
 
-                for i, val_data in enumerate(val_dataset):
+                for i, val_data in tqdm.tqdm(enumerate(val_dataloader), total=len(val_dataloader)):
                     val_mel = val_data['mel'].to(device)
-                    val_mel = val_mel.unsqueeze(0)
-                    wav_fake = g_model.inference(val_mel).squeeze().cpu().numpy()
-                    wav_real = val_data['wav'].detach().squeeze().cpu().numpy()
-                    wav_f = torch.tensor(wav_fake).unsqueeze(0).to(device)
-                    wav_r = torch.tensor(wav_real).unsqueeze(0).to(device)
-                    val_wavs.append((wav_fake, wav_real))
+                    with torch.no_grad():
+                        wav_f = g_model(val_mel).squeeze(0)
+                    wav_r = val_data['wav'].squeeze(0)
+                    #wav_f = torch.tensor(wav_fake).unsqueeze(0).to(device)
+                    #wav_r = torch.tensor(wav_real).unsqueeze(0).to(device)
                     size = min(wav_r.size(-1), wav_f.size(-1))
                     val_n, val_s = multires_stft_loss(wav_f[..., :size], wav_r[..., :size])
                     val_norm_loss += val_n
                     val_spec_loss += val_s
+                    if val_wav_r is None or wav_r.size(-1) > val_wav_r.size(-1):
+                        val_wav_r = wav_r
+                        val_wav_f = wav_f
 
                 val_norm_loss /= len(val_dataset)
                 val_spec_loss /= len(val_dataset)
                 summary_writer.add_scalar('val_stft_norm_loss', val_norm_loss, global_step=step)
                 summary_writer.add_scalar('val_stft_spec_loss', val_spec_loss, global_step=step)
-                val_wavs.sort(key=lambda x: x[1].shape[0])
-                wav_fake, wav_real = val_wavs[-1]
                 if val_norm_loss + val_spec_loss < best_stft:
                     best_stft = val_norm_loss + val_spec_loss
                     print(f'\nnew best stft: {best_stft}')
@@ -170,13 +174,13 @@ if __name__ == '__main__':
                         'config': config,
                         'step': step
                     }, f'checkpoints/best_model_{model_name}.pt')
-                    summary_writer.add_audio('best_generated', wav_fake, sample_rate=audio.sample_rate, global_step=step)
+                    summary_writer.add_audio('best_generated', val_wav_f.detach().cpu().numpy(), sample_rate=audio.sample_rate, global_step=step)
 
                 g_model.train()
-                summary_writer.add_audio('generated', wav_fake, sample_rate=audio.sample_rate, global_step=step)
-                summary_writer.add_audio('target', wav_real, sample_rate=audio.sample_rate, global_step=step)
-                mel_fake = audio.wav_to_mel(wav_fake)
-                mel_real = audio.wav_to_mel(wav_real)
+                summary_writer.add_audio('generated', val_wav_f.detach().cpu().numpy(), sample_rate=audio.sample_rate, global_step=step)
+                summary_writer.add_audio('target', val_wav_r.detach().cpu().numpy(), sample_rate=audio.sample_rate, global_step=step)
+                mel_fake = audio.wav_to_mel(val_wav_f.squeeze().detach().cpu().numpy())
+                mel_real = audio.wav_to_mel(val_wav_r.squeeze().detach().cpu().numpy())
                 mel_fake_plot = plot_mel(mel_fake)
                 mel_real_plot = plot_mel(mel_real)
                 summary_writer.add_figure('mel_generated', mel_fake_plot, global_step=step)
