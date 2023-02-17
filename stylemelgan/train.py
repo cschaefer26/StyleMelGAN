@@ -159,8 +159,8 @@ if __name__ == '__main__':
                         val_wav_r = wav_r
                         val_wav_f = wav_f
 
-                val_norm_loss /= len(val_dataset)
-                val_spec_loss /= len(val_dataset)
+                val_norm_loss /= len(val_dataloader)
+                val_spec_loss /= len(val_dataloader)
                 summary_writer.add_scalar('val_stft_norm_loss', val_norm_loss, global_step=step)
                 summary_writer.add_scalar('val_stft_spec_loss', val_spec_loss, global_step=step)
                 if val_norm_loss + val_spec_loss < best_stft:
