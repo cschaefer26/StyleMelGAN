@@ -12,7 +12,21 @@ import numpy as np
 
 MAX_WAV_VALUE = 32768.0
 
+class HighwayNetwork(nn.Module):
 
+    def __init__(self, size: int) -> None:
+        super().__init__()
+        self.W1 = nn.Linear(size, size)
+        self.W2 = nn.Linear(size, size)
+        self.W1.bias.data.fill_(0.)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = x.transpose(1, 2)
+        x1 = self.W1(x)
+        x2 = self.W2(x)
+        g = torch.sigmoid(x2)
+        y = g * F.relu(x1) + (1. - g) * x
+        return y.transpose(1, 2)
 
 class ResStack(nn.Module):
     def __init__(self, channel, num_layers=4):
@@ -24,13 +38,15 @@ class ResStack(nn.Module):
                 nn.ReflectionPad1d(3**i),
                 nn.utils.weight_norm(nn.Conv1d(channel, channel, kernel_size=3, dilation=3**i)),
                 nn.LeakyReLU(0.2),
-                nn.utils.weight_norm(nn.Conv1d(channel, channel, kernel_size=1)),
+                HighwayNetwork(channel),
+                #nn.utils.weight_norm(nn.Conv1d(channel, channel, kernel_size=1)),
             )
             for i in range(num_layers)
         ])
 
         self.shortcuts = nn.ModuleList([
-            nn.utils.weight_norm(nn.Conv1d(channel, channel, kernel_size=1))
+            #nn.utils.weight_norm(nn.Conv1d(channel, channel, kernel_size=1))
+            HighwayNetwork(channel)
             for i in range(num_layers)
         ])
 
@@ -53,31 +69,31 @@ class Generator(nn.Module):
 
         self.generator = nn.Sequential(
             nn.ReflectionPad1d(3),
-            nn.utils.weight_norm(nn.Conv1d(mel_channel, 512, kernel_size=7, stride=1)),
-
-            nn.LeakyReLU(0.2),
-            nn.utils.weight_norm(nn.ConvTranspose1d(512, 256, kernel_size=16, stride=8, padding=4)),
-
-            ResStack(256, num_layers=5),
+            nn.utils.weight_norm(nn.Conv1d(mel_channel, 256, kernel_size=7, stride=1)),
 
             nn.LeakyReLU(0.2),
             nn.utils.weight_norm(nn.ConvTranspose1d(256, 128, kernel_size=16, stride=8, padding=4)),
 
-            ResStack(128, num_layers=7),
+            ResStack(128, num_layers=5),
 
             nn.LeakyReLU(0.2),
-            nn.utils.weight_norm(nn.ConvTranspose1d(128, 64, kernel_size=4, stride=2, padding=1)),
+            nn.utils.weight_norm(nn.ConvTranspose1d(128, 64, kernel_size=16, stride=8, padding=4)),
 
-            ResStack(64, num_layers=8),
+            ResStack(64, num_layers=7),
 
             nn.LeakyReLU(0.2),
             nn.utils.weight_norm(nn.ConvTranspose1d(64, 32, kernel_size=4, stride=2, padding=1)),
 
-            ResStack(32, num_layers=9),
+            ResStack(32, num_layers=8),
+
+            nn.LeakyReLU(0.2),
+            nn.utils.weight_norm(nn.ConvTranspose1d(32, 16, kernel_size=4, stride=2, padding=1)),
+
+            ResStack(16, num_layers=9),
 
             nn.LeakyReLU(0.2),
             nn.ReflectionPad1d(3),
-            nn.utils.weight_norm(nn.Conv1d(32, 1, kernel_size=7, stride=1)),
+            nn.utils.weight_norm(nn.Conv1d(16, 1, kernel_size=7, stride=1)),
             nn.Tanh(),
         )
 
