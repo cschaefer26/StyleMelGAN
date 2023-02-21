@@ -21,8 +21,8 @@ class ResStack(nn.Module):
         self.blocks = nn.ModuleList([
             nn.Sequential(
                 nn.LeakyReLU(0.2),
-                nn.ReflectionPad1d(3**i),
-                nn.utils.weight_norm(nn.Conv1d(channel, channel, kernel_size=3, dilation=3**i)),
+                nn.ReflectionPad1d(3**(i+1)),
+                nn.utils.weight_norm(nn.Conv1d(channel, channel, kernel_size=3, dilation=3**(i+1))),
                 nn.LeakyReLU(0.2),
                 nn.utils.weight_norm(nn.Conv1d(channel, channel, kernel_size=1)),
             )
@@ -36,7 +36,7 @@ class ResStack(nn.Module):
 
     def forward(self, x):
         for block, shortcut in zip(self.blocks, self.shortcuts):
-            x = shortcut(x) + block(x)
+            x = x + shortcut(x) + block(x)
         return x
 
     def remove_weight_norm(self):
@@ -58,22 +58,22 @@ class Generator(nn.Module):
             nn.LeakyReLU(0.2),
             nn.utils.weight_norm(nn.ConvTranspose1d(512, 256, kernel_size=16, stride=8, padding=4)),
 
-            ResStack(256, num_layers=5),
+            ResStack(256, num_layers=4),
 
             nn.LeakyReLU(0.2),
             nn.utils.weight_norm(nn.ConvTranspose1d(256, 128, kernel_size=16, stride=8, padding=4)),
 
-            ResStack(128, num_layers=6),
+            ResStack(128, num_layers=5),
 
             nn.LeakyReLU(0.2),
             nn.utils.weight_norm(nn.ConvTranspose1d(128, 64, kernel_size=4, stride=2, padding=1)),
 
-            ResStack(64, num_layers=7),
+            ResStack(64, num_layers=6),
 
             nn.LeakyReLU(0.2),
             nn.utils.weight_norm(nn.ConvTranspose1d(64, 32, kernel_size=4, stride=2, padding=1)),
 
-            ResStack(32, num_layers=8),
+            ResStack(32, num_layers=7),
 
             nn.LeakyReLU(0.2),
             nn.ReflectionPad1d(3),
