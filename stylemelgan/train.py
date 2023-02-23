@@ -116,8 +116,8 @@ if __name__ == '__main__':
                 d_fake = d_model(wav_fake)
                 for (feat_fake, score_fake), (feat_real, _) in zip(d_fake, d_real):
                     g_loss += torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
-                    #for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
-                    #    g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
+                    for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
+                        g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
             p_model.zero_grad()
             p_out = p_model(wav_real)
