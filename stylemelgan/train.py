@@ -11,7 +11,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from stylemelgan.audio import Audio
 from stylemelgan.dataset import new_dataloader, AudioDataset
-from stylemelgan.discriminator import MultiScaleDiscriminator
+from stylemelgan.discriminator import MultiScaleDiscriminator, MelPredictor
 from stylemelgan.generator.melgan import Generator
 from stylemelgan.losses import stft, MultiResStftLoss
 from stylemelgan.utils import read_config
@@ -47,12 +47,16 @@ if __name__ == '__main__':
 
     g_model = Generator(audio.n_mels).to(device)
     d_model = MultiScaleDiscriminator().to(device)
+    p_model = MelPredictor().to(device)
     train_cfg = config['training']
     g_optim = torch.optim.Adam(g_model.parameters(), lr=train_cfg['g_lr'], betas=(0.5, 0.9))
     d_optim = torch.optim.Adam(d_model.parameters(), lr=train_cfg['d_lr'], betas=(0.5, 0.9))
+    p_optim = torch.optim.Adam(p_model.parameters(), lr=train_cfg['d_lr'], betas=(0.5, 0.9))
     for g in g_optim.param_groups:
         g['lr'] = train_cfg['g_lr']
     for g in d_optim.param_groups:
+        g['lr'] = train_cfg['d_lr']
+    for g in p_optim.param_groups:
         g['lr'] = train_cfg['d_lr']
     multires_stft_loss = MultiResStftLoss().to(device)
 
@@ -62,6 +66,8 @@ if __name__ == '__main__':
         g_optim.load_state_dict(checkpoint['optim_g'])
         d_model.load_state_dict(checkpoint['model_d'])
         d_optim.load_state_dict(checkpoint['optim_d'])
+        p_model.load_state_dict(checkpoint['model_p'])
+        p_optim.load_state_dict(checkpoint['optim_p'])
         step = checkpoint['step']
         print(f'Loaded model with step {step}')
     except Exception as e:
@@ -88,7 +94,6 @@ if __name__ == '__main__':
             step += 1
             mel = data['mel'].to(device)
             wav_real = data['wav'].to(device)
-
             wav_fake = g_model(mel)[:, :, :train_cfg['segment_len']]
 
             d_loss = 0.0
@@ -111,13 +116,23 @@ if __name__ == '__main__':
                 d_fake = d_model(wav_fake)
                 for (feat_fake, score_fake), (feat_real, _) in zip(d_fake, d_real):
                     g_loss += torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
-                    for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
-                        g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
+                    #for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
+                    #    g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
+
+            p_model.zero_grad()
+            p_out = p_model(wav_real)
+            p_loss = F.l1_loss(p_out, mel)
+            p_optim.zero_grad()
+            p_loss.backward()
+            p_optim.step()
+
+            p_fake = p_model(wav_fake)
+            gp_loss = F.l1_loss(p_fake, mel)
 
             factor = 1. if step < pretraining_steps else 0.
 
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
-            g_loss_all = g_loss + factor * (stft_norm_loss + stft_spec_loss)
+            g_loss_all = g_loss + factor * (stft_norm_loss + stft_spec_loss) + gp_loss
 
             g_optim.zero_grad()
             g_loss_all.backward()
@@ -132,6 +147,8 @@ if __name__ == '__main__':
             summary_writer.add_scalar('generator_loss', g_loss, global_step=step)
             summary_writer.add_scalar('stft_norm_loss', stft_norm_loss, global_step=step)
             summary_writer.add_scalar('stft_spec_loss', stft_spec_loss, global_step=step)
+            #summary_writer.add_scalar('mel_loss', p_loss, global_step=step)
+            summary_writer.add_scalar('generator_mel_loss', gp_loss, global_step=step)
             summary_writer.add_scalar('discriminator_loss', d_loss, global_step=step)
 
             if step % train_cfg['eval_steps'] == 0:
@@ -163,10 +180,7 @@ if __name__ == '__main__':
                     best_stft = val_norm_loss + val_spec_loss
                     print(f'\nnew best stft: {best_stft}')
                     torch.save({
-                        'g_model_g': g_model.state_dict(),
-                        'g_optim_g': g_optim.state_dict(),
-                        'model_d': d_model.state_dict(),
-                        'optim_d': d_optim.state_dict(),
+                        'model_g': g_model.state_dict(),
                         'config': config,
                         'step': step
                     }, f'checkpoints/best_model_{model_name}.pt')
@@ -188,6 +202,8 @@ if __name__ == '__main__':
             'optim_g': g_optim.state_dict(),
             'model_d': d_model.state_dict(),
             'optim_d': d_optim.state_dict(),
+            'model_p': p_model.state_dict(),
+            'optim_p': p_optim.state_dict(),
             'config': config,
             'step': step
         }, f'checkpoints/latest_model__{model_name}.pt')

@@ -59,6 +59,51 @@ class Discriminator(nn.Module):
         return features[:-1], features[-1]
 
 
+
+class MelPredictor(nn.Module):
+    def __init__(self):
+        super(MelPredictor, self).__init__()
+
+        self.discriminator = nn.ModuleList([
+            nn.Sequential(
+                nn.ReflectionPad1d(7),
+                nn.utils.weight_norm(nn.Conv1d(1, 16, kernel_size=15, stride=1)),
+                nn.LeakyReLU(0.2, inplace=True),
+            ),
+            nn.Sequential(
+                nn.utils.weight_norm(nn.Conv1d(16, 64, kernel_size=41, stride=4, padding=20, groups=4)),
+                nn.LeakyReLU(0.2, inplace=True),
+            ),
+            nn.Sequential(
+                nn.utils.weight_norm(nn.Conv1d(64, 256, kernel_size=41, stride=4, padding=20, groups=16)),
+                nn.LeakyReLU(0.2, inplace=True),
+            ),
+            nn.Sequential(
+                nn.utils.weight_norm(nn.Conv1d(256, 1024, kernel_size=41, stride=4, padding=20, groups=64)),
+                nn.LeakyReLU(0.2, inplace=True),
+            ),
+            nn.Sequential(
+                nn.utils.weight_norm(nn.Conv1d(1024, 1024, kernel_size=41, stride=4, padding=20, groups=256)),
+                nn.LeakyReLU(0.2, inplace=True),
+            ),
+            nn.Sequential(
+                nn.utils.weight_norm(nn.Conv1d(1024, 1024, kernel_size=5, stride=1, padding=2)),
+                nn.LeakyReLU(0.2, inplace=True),
+            ),
+            nn.utils.weight_norm(nn.Conv1d(1024, 80, kernel_size=3, stride=1, padding=1)),
+        ])
+
+    def forward(self, x):
+        '''
+            returns: (list of 6 features, discriminator score)
+            we directly predict score without last sigmoid function
+            since we're using Least Squares GAN (https://arxiv.org/abs/1611.04076)
+        '''
+        for module in self.discriminator:
+            x = module(x)
+        return x
+
+
 class MultiScaleDiscriminator(nn.Module):
 
     def __init__(self):
