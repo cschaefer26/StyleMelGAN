@@ -73,6 +73,9 @@ if __name__ == '__main__':
     dataloader = new_dataloader(data_path=train_data_path, segment_len=train_cfg['segment_len'],
                                 hop_len=audio.hop_length, batch_size=train_cfg['batch_size'],
                                 num_workers=train_cfg['num_workers'], sample_rate=audio.sample_rate)
+    val_dataloader = new_dataloader(data_path=train_data_path, segment_len=None,
+                                    hop_len=audio.hop_length, batch_size=1,
+                                    num_workers=train_cfg['num_workers'], sample_rate=audio.sample_rate)
     val_dataset = AudioDataset(data_path=val_data_path, segment_len=None, hop_len=audio.hop_length,
                                sample_rate=audio.sample_rate)
 
