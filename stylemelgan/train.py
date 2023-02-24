@@ -133,8 +133,8 @@ if __name__ == '__main__':
                                       f'| stft_norm_loss {stft_norm_loss:#.4} '
                                       f'| stft_spec_loss {stft_spec_loss:#.4} ', refresh=True)
 
-            summary_writer.add_scalar('params/generator_lr', scheduler_g.get_last_lr(), global_step=step)
-            summary_writer.add_scalar('params/discriminator_lr', scheduler_d.get_last_lr(), global_step=step)
+            summary_writer.add_scalar('params/generator_lr', scheduler_g.get_last_lr()[0], global_step=step)
+            summary_writer.add_scalar('params/discriminator_lr', scheduler_d.get_last_lr()[0], global_step=step)
             summary_writer.add_scalar('generator_loss', g_loss, global_step=step)
             summary_writer.add_scalar('stft_norm_loss', stft_norm_loss, global_step=step)
             summary_writer.add_scalar('stft_spec_loss', stft_spec_loss, global_step=step)
