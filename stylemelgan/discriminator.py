@@ -99,9 +99,11 @@ class MelPredictor(nn.Module):
             we directly predict score without last sigmoid function
             since we're using Least Squares GAN (https://arxiv.org/abs/1611.04076)
         '''
+        features = list()
         for module in self.discriminator:
             x = module(x)
-        return x
+            features.append(x)
+        return features[:-1], features[-1]
 
 
 class MultiScaleDiscriminator(nn.Module):
