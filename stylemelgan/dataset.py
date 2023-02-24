@@ -110,7 +110,7 @@ class AudioDataset(Dataset):
 
 
 def new_dataloader(data_path: Path,
-                   segment_len: int,
+                   segment_len: Union[int, None],
                    hop_len: int,
                    batch_size: int,
                    sample_rate: int,

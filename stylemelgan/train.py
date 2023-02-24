@@ -8,7 +8,6 @@ import tqdm
 from matplotlib.figure import Figure
 from torch.cuda import is_available
 from torch.utils.tensorboard import SummaryWriter
-from lion_pytorch import Lion
 from stylemelgan.audio import Audio
 from stylemelgan.dataset import new_dataloader, AudioDataset
 from stylemelgan.discriminator import MultiScaleDiscriminator
@@ -48,15 +47,11 @@ if __name__ == '__main__':
     g_model = Generator(audio.n_mels).to(device)
     d_model = MultiScaleDiscriminator().to(device)
     train_cfg = config['training']
-    g_optim = Lion(g_model.parameters(), lr=train_cfg['g_lr'])
-    d_optim = Lion(d_model.parameters(), lr=train_cfg['d_lr'])
-    #g_optim = torch.optim.Adam(g_model.parameters(), lr=train_cfg['g_lr'], betas=(0.5, 0.9))
-    #d_optim = torch.optim.Adam(d_model.parameters(), lr=train_cfg['d_lr'], betas=(0.5, 0.9))
-    #for g in g_optim.param_groups:
-    #    g['lr'] = train_cfg['g_lr']
-    #for g in d_optim.param_groups:
-    #    g['lr'] = train_cfg['d_lr']
+
+    g_optim = torch.optim.AdamW(g_model.parameters(), lr=train_cfg['g_lr'], betas=(0.8, 0.99))
+    d_optim = torch.optim.AdamW(d_model.parameters(), lr=train_cfg['d_lr'], betas=(0.8, 0.99))
     multires_stft_loss = MultiResStftLoss().to(device)
+    last_epoch = 0
 
     try:
         checkpoint = torch.load(f'checkpoints/latest_model__{model_name}.pt', map_location=device)
@@ -65,9 +60,13 @@ if __name__ == '__main__':
         d_model.load_state_dict(checkpoint['model_d'])
         d_optim.load_state_dict(checkpoint['optim_d'])
         step = checkpoint['step']
+        last_epoch = checkpoint['epoch']
         print(f'Loaded model with step {step}')
     except Exception as e:
         'Initializing model from scratch.'
+
+    scheduler_g = torch.optim.lr_scheduler.ExponentialLR(g_optim, gamma=train_cfg['lr_decay'], last_epoch=last_epoch)
+    scheduler_d = torch.optim.lr_scheduler.ExponentialLR(d_optim, gamma=train_cfg['lr_decay'], last_epoch=last_epoch)
 
     train_cfg = config['training']
     dataloader = new_dataloader(data_path=train_data_path, segment_len=train_cfg['segment_len'],
@@ -87,7 +86,7 @@ if __name__ == '__main__':
 
     best_stft = 9999
 
-    for epoch in range(train_cfg['epochs']):
+    for epoch in range(last_epoch, train_cfg['epochs']):
         pbar = tqdm.tqdm(enumerate(dataloader, 1), total=len(dataloader))
         for i, data in pbar:
             step += 1
@@ -134,6 +133,8 @@ if __name__ == '__main__':
                                       f'| stft_norm_loss {stft_norm_loss:#.4} '
                                       f'| stft_spec_loss {stft_spec_loss:#.4} ', refresh=True)
 
+            summary_writer.add_scalar('params/generator_lr', scheduler_g.get_lr(), global_step=step)
+            summary_writer.add_scalar('params/discriminator_lr', scheduler_d.get_lr(), global_step=step)
             summary_writer.add_scalar('generator_loss', g_loss, global_step=step)
             summary_writer.add_scalar('stft_norm_loss', stft_norm_loss, global_step=step)
             summary_writer.add_scalar('stft_spec_loss', stft_spec_loss, global_step=step)
@@ -151,8 +152,6 @@ if __name__ == '__main__':
                     with torch.no_grad():
                         wav_f = g_model(val_mel).squeeze(0)
                     wav_r = val_data['wav'].squeeze(0).to(device)
-                    #wav_f = torch.tensor(wav_fake).unsqueeze(0).to(device)
-                    #wav_r = torch.tensor(wav_real).unsqueeze(0).to(device)
                     size = min(wav_r.size(-1), wav_f.size(-1))
                     val_n, val_s = multires_stft_loss(wav_f[..., :size], wav_r[..., :size])
                     val_norm_loss += val_n
@@ -169,12 +168,10 @@ if __name__ == '__main__':
                     best_stft = val_norm_loss + val_spec_loss
                     print(f'\nnew best stft: {best_stft}')
                     torch.save({
-                        'g_model_g': g_model.state_dict(),
-                        'g_optim_g': g_optim.state_dict(),
-                        'model_d': d_model.state_dict(),
-                        'optim_d': d_optim.state_dict(),
+                        'model_g': g_model.state_dict(),
                         'config': config,
-                        'step': step
+                        'step': step,
+                        'epoch': epoch
                     }, f'checkpoints/best_model_{model_name}.pt')
                     summary_writer.add_audio('best_generated', val_wav_f.detach().cpu().numpy(), sample_rate=audio.sample_rate, global_step=step)
 
@@ -189,11 +186,15 @@ if __name__ == '__main__':
                 summary_writer.add_figure('mel_target', mel_real_plot, global_step=step)
 
         # epoch end
+        scheduler_g.step()
+        scheduler_d.step()
+
         torch.save({
             'model_g': g_model.state_dict(),
             'optim_g': g_optim.state_dict(),
             'model_d': d_model.state_dict(),
             'optim_d': d_optim.state_dict(),
             'config': config,
-            'step': step
+            'step': step,
+            'epoch': epoch
         }, f'checkpoints/latest_model__{model_name}.pt')
