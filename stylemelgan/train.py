@@ -51,7 +51,7 @@ if __name__ == '__main__':
     g_optim = torch.optim.AdamW(g_model.parameters(), lr=train_cfg['g_lr'], betas=(0.8, 0.99))
     d_optim = torch.optim.AdamW(d_model.parameters(), lr=train_cfg['d_lr'], betas=(0.8, 0.99))
     multires_stft_loss = MultiResStftLoss().to(device)
-    last_epoch = 0
+    last_epoch = -1
 
     try:
         checkpoint = torch.load(f'checkpoints/latest_model__{model_name}.pt', map_location=device)
