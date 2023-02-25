@@ -291,17 +291,18 @@ class Generator(nn.Module):
             res_block.remove_weight_norm()
 
     def inference(self, c, z=None):
-        # pad input mel with zeros to cut artifact
-        # see https://github.com/seungwonpark/melgan/issues/8
-        zero = torch.full((1, self.mel_channel, 10), -11.5129).to(c.device)
-        mel = torch.cat((c, zero), dim=2)
+        with torch.no_grad():
+            # pad input mel with zeros to cut artifact
+            # see https://github.com/seungwonpark/melgan/issues/8
+            zero = torch.full((1, self.mel_channel, 10), -11.5129).to(c.device)
+            mel = torch.cat((c, zero), dim=2)
 
-        audio = self.forward(mel)
-        audio = audio.squeeze() # collapse all dimension except time axis
-        audio = audio[:-(self.hop_length*10)]
-        #audio = MAX_WAV_VALUE * audio
-        #audio = audio.clamp(min=-MAX_WAV_VALUE, max=MAX_WAV_VALUE-1)
-        #audio = audio.short()
+            audio = self.forward(mel)
+            audio = audio.squeeze() # collapse all dimension except time axis
+            audio = audio[:-(self.hop_length*10)]
+            #audio = MAX_WAV_VALUE * audio
+            #audio = audio.clamp(min=-MAX_WAV_VALUE, max=MAX_WAV_VALUE-1)
+            #audio = audio.short()
 
         return audio
 
