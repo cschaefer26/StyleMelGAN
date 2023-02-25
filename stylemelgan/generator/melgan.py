@@ -299,9 +299,9 @@ class Generator(nn.Module):
         audio = self.forward(mel)
         audio = audio.squeeze() # collapse all dimension except time axis
         audio = audio[:-(self.hop_length*10)]
-        audio = MAX_WAV_VALUE * audio
-        audio = audio.clamp(min=-MAX_WAV_VALUE, max=MAX_WAV_VALUE-1)
-        audio = audio.short()
+        #audio = MAX_WAV_VALUE * audio
+        #audio = audio.clamp(min=-MAX_WAV_VALUE, max=MAX_WAV_VALUE-1)
+        #audio = audio.short()
 
         return audio
 
