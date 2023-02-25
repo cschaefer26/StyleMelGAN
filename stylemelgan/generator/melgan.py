@@ -240,7 +240,7 @@ class Generator(nn.Module):
                     stride=stride,
                     dilations=[1, 3, 9, 27],
                     lReLU_slope=0.2,
-                    cond_hop_length=256,
+                    cond_hop_length=hop_length,
                     kpnet_conv_size=3
                 )
             )
@@ -297,10 +297,7 @@ class Generator(nn.Module):
         zero = torch.full((1, self.mel_channel, 10), -11.5129).to(c.device)
         mel = torch.cat((c, zero), dim=2)
 
-        if z is None:
-            z = torch.randn(1, self.noise_dim, mel.size(2)).to(mel.device)
-
-        audio = self.forward(mel, z)
+        audio = self.forward(mel)
         audio = audio.squeeze() # collapse all dimension except time axis
         audio = audio[:-(self.hop_length*10)]
         audio = MAX_WAV_VALUE * audio
@@ -317,14 +314,14 @@ if __name__ == '__main__':
     x = torch.randn(3, 80, 1000)
     start = time.time()
     for i in range(1):
-        y = model(x)
+        y = model.forward(x)
     dur = time.time() - start
 
     print('dur ', dur)
 
-    #y = model(x)
-    #print(y.shape)
-    #assert y.shape == torch.Size([3, 1, 2560])
+    y = model(x)
+    print(y.shape)
+    assert y.shape == torch.Size([3, 1, 256000])
 
     pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(pytorch_total_params)
