@@ -111,7 +111,7 @@ class LVCBlock(torch.nn.Module):
             in_channels,
             cond_channels,
             stride,
-            dilations=[1, 3, 9, 27],
+            dilations=[1, 3, 9, 27, 81],
             lReLU_slope=0.2,
             conv_kernel_size=3,
             cond_hop_length=256,
@@ -226,8 +226,7 @@ class Generator(nn.Module):
         self.mel_channel = 80
         self.noise_dim = 64
         self.hop_length = 256
-        channel_size = 16
-        kpnet_conv_size = 3
+        channel_size = 32
 
         self.res_stack = nn.ModuleList()
         hop_length = 1
@@ -238,7 +237,7 @@ class Generator(nn.Module):
                     channel_size,
                     80,
                     stride=stride,
-                    dilations=[1, 3, 9, 27],
+                    dilations=[1, 3, 9, 27, 81],
                     lReLU_slope=0.2,
                     cond_hop_length=hop_length,
                     kpnet_conv_size=3
