@@ -42,10 +42,8 @@ class ResBlock(nn.Module):
         ])
 
     def forward(self, x):
-        for short in self.shortcuts:
-            x = short(x)
-        for block in self.blocks:
-            x = x + block(x)
+        for short, block in zip(self.shortcuts, self.blocks):
+            x = short(x) + block(x)
         return x
 
     def remove_weight_norm(self):
