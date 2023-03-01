@@ -111,7 +111,7 @@ class LVCBlock(torch.nn.Module):
             in_channels,
             cond_channels,
             stride,
-            dilations=[1, 3, 9, 27, 81],
+            dilations,
             lReLU_slope=0.2,
             conv_kernel_size=3,
             cond_hop_length=256,
@@ -230,14 +230,21 @@ class Generator(nn.Module):
 
         self.res_stack = nn.ModuleList()
         hop_length = 1
-        for stride in [8, 8, 2, 2]:
+
+        dilations = [
+            [1, 3, 9, 27],
+            [1, 3, 9, 27, 81],
+            [1, 3, 9, 27, 81, 243],
+            [1, 3, 9, 27, 81, 253, 729],
+        ]
+        for stride, dilations in zip([8, 8, 2, 2], dilations):
             hop_length = stride * hop_length
             self.res_stack.append(
                 LVCBlock(
                     channel_size,
                     80,
                     stride=stride,
-                    dilations=[1, 3, 9, 27, 81],
+                    dilations=dilations,
                     lReLU_slope=0.2,
                     cond_hop_length=hop_length,
                     kpnet_conv_size=3
