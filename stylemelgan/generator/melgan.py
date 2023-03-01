@@ -153,11 +153,11 @@ class LVCBlock(torch.nn.Module):
             )
 
         self.shortcuts = nn.ModuleList([
-            nn.utils.weight_norm(nn.Conv1d(in_channels, in_channels, 1))
+            nn.utils.weight_norm(nn.Conv1d(in_channels, in_channels, 1)) for i in range(len(dilations))
         ])
 
         self.projections = nn.ModuleList([
-            nn.utils.weight_norm(nn.Conv1d(in_channels, in_channels, 1))
+            nn.utils.weight_norm(nn.Conv1d(in_channels, in_channels, 1)) for i in range(len(dilations))
         ])
 
     def forward(self, x, c):
@@ -235,7 +235,7 @@ class Generator(nn.Module):
         self.mel_channel = 80
         self.noise_dim = 64
         self.hop_length = 256
-        channel_size = 64
+        channel_size = 32
 
         self.res_stack = nn.ModuleList()
         hop_length = 1
