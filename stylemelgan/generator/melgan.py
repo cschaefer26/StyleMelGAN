@@ -175,6 +175,7 @@ class LVCBlock(torch.nn.Module):
         kernels, bias = self.kernel_predictor(c)
 
         for i, (conv, proj, short) in enumerate(zip(self.conv_blocks, self.projections, self.shortcuts)):
+            x_res = short(x)
             output = conv(x)                # (B, c_g, stride * L')
 
             k = kernels[:, i, :, :, :, :]   # (B, 2 * c_g, c_g, kernel_size, cond_length)
@@ -183,7 +184,7 @@ class LVCBlock(torch.nn.Module):
             output = self.location_variable_convolution(output, k, b, hop_size=self.cond_hop_length)    # (B, 2 * c_g, stride * L'): LVC
             output = proj(output)
             #x = x + torch.sigmoid(output[ :, :in_channels, :]) * torch.tanh(output[:, in_channels:, :]) # (B, c_g, stride * L'): GAU
-            x = short(x) + output[:, :, :]
+            x = x_res + output[:, :, :]
         return x
 
     def location_variable_convolution(self, x, kernel, bias, dilation=1, hop_size=256):
