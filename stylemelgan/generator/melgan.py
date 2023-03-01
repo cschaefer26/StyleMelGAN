@@ -156,9 +156,6 @@ class LVCBlock(torch.nn.Module):
             nn.utils.weight_norm(nn.Conv1d(in_channels, in_channels, 1)) for i in range(len(dilations))
         ])
 
-        self.projections = nn.ModuleList([
-            nn.utils.weight_norm(nn.Conv1d(in_channels, in_channels, 1)) for i in range(len(dilations))
-        ])
 
     def forward(self, x, c):
         ''' forward propagation of the location-variable convolutions.
@@ -174,7 +171,7 @@ class LVCBlock(torch.nn.Module):
         x = self.convt_pre(x)               # (B, c_g, stride * L')
         kernels, bias = self.kernel_predictor(c)
 
-        for i, (conv, proj, short) in enumerate(zip(self.conv_blocks, self.projections, self.shortcuts)):
+        for i, (conv, short) in enumerate(zip(self.conv_blocks, self.shortcuts)):
             x_res = short(x)
             output = conv(x)                # (B, c_g, stride * L')
 
@@ -182,8 +179,6 @@ class LVCBlock(torch.nn.Module):
             b = bias[:, i, :, :]            # (B, 2 * c_g, cond_length)
 
             output = self.location_variable_convolution(output, k, b, hop_size=self.cond_hop_length)    # (B, 2 * c_g, stride * L'): LVC
-            output = proj(output)
-            #x = x + torch.sigmoid(output[ :, :in_channels, :]) * torch.tanh(output[:, in_channels:, :]) # (B, c_g, stride * L'): GAU
             x = x_res + output[:, :, :]
         return x
 
