@@ -179,7 +179,7 @@ class LVCBlock(torch.nn.Module):
             b = bias[:, i, :, :]            # (B, 2 * c_g, cond_length)
 
             output = self.location_variable_convolution(output, k, b, hop_size=self.cond_hop_length)    # (B, 2 * c_g, stride * L'): LVC
-            x = x + torch.sigmoid(output[ :, :in_channels, :]) * torch.tanh(output[:, in_channels:, :]) # (B, c_g, stride * L'): GAU
+            x = x_res + torch.sigmoid(output[ :, :in_channels, :]) * torch.tanh(output[:, in_channels:, :]) # (B, c_g, stride * L'): GAU
 
         return x
 
