@@ -13,6 +13,39 @@ import numpy as np
 MAX_WAV_VALUE = 32768.0
 
 
+
+class ResStack(nn.Module):
+    def __init__(self, channel, num_layers=4):
+        super(ResStack, self).__init__()
+
+        self.blocks = nn.ModuleList([
+            nn.Sequential(
+                nn.LeakyReLU(0.2),
+                nn.ReflectionPad1d(3**i),
+                nn.utils.weight_norm(nn.Conv1d(channel, channel, kernel_size=3, dilation=3**i)),
+                nn.LeakyReLU(0.2),
+                nn.utils.weight_norm(nn.Conv1d(channel, channel, kernel_size=1)),
+            )
+            for i in range(num_layers)
+        ])
+
+        self.shortcuts = nn.ModuleList([
+            nn.utils.weight_norm(nn.Conv1d(channel, channel, kernel_size=1))
+            for i in range(num_layers)
+        ])
+
+    def forward(self, x):
+        for block, shortcut in zip(self.blocks, self.shortcuts):
+            x = shortcut(x) + block(x)
+        return x
+
+    def remove_weight_norm(self):
+        for block, shortcut in zip(self.blocks, self.shortcuts):
+            nn.utils.remove_weight_norm(block[2])
+            nn.utils.remove_weight_norm(block[4])
+            nn.utils.remove_weight_norm(shortcut)
+
+
 class KernelPredictor(torch.nn.Module):
     ''' Kernel predictor for the location-variable convolutions'''
     def __init__(
@@ -118,6 +151,7 @@ class LVCBlock(torch.nn.Module):
             kpnet_hidden_channels=64,
             kpnet_conv_size=3,
             kpnet_dropout=0.0,
+            res_layers=4
     ):
         super().__init__()
 
@@ -136,6 +170,8 @@ class LVCBlock(torch.nn.Module):
             kpnet_dropout=kpnet_dropout,
             kpnet_nonlinear_activation_params={"negative_slope":lReLU_slope}
         )
+
+        self.res_stack = ResStack(in_channels, num_layers=res_layers)
 
         self.convt_pre = nn.Sequential(
             nn.LeakyReLU(lReLU_slope),
@@ -174,6 +210,8 @@ class LVCBlock(torch.nn.Module):
 
             output = self.location_variable_convolution(output, k, b, hop_size=self.cond_hop_length)    # (B, 2 * c_g, stride * L'): LVC
             x = x + torch.sigmoid(output[ :, :in_channels, :]) * torch.tanh(output[:, in_channels:, :]) # (B, c_g, stride * L'): GAU
+
+        x = self.res_stack(x)
 
         return x
 
@@ -226,18 +264,21 @@ class Generator(nn.Module):
         self.mel_channel = 80
         self.noise_dim = 64
         self.hop_length = 256
-        channel_size = 32
+        channel_size = 24
 
         self.res_stack = nn.ModuleList()
         hop_length = 1
 
         dilations = [
-            [1, 3, 9, 27],
             [1, 3, 9, 27, 81],
-            [1, 3, 9, 27, 81, 243],
-            [1, 3, 9, 27, 81, 253, 729],
+            [1, 3, 9, 27, 81],
+            [1, 3, 9, 27, 81],
+            [1, 3, 9, 27, 81],
         ]
-        for stride, dilations in zip([8, 8, 2, 2], dilations):
+
+        res_layers = [5, 7, 8, 9]
+
+        for stride, dilations, l in zip([8, 8, 2, 2], dilations, res_layers):
             hop_length = stride * hop_length
             self.res_stack.append(
                 LVCBlock(
@@ -247,7 +288,8 @@ class Generator(nn.Module):
                     dilations=dilations,
                     lReLU_slope=0.2,
                     cond_hop_length=hop_length,
-                    kpnet_conv_size=3
+                    kpnet_conv_size=3,
+                    res_layers=l
                 )
             )
 
