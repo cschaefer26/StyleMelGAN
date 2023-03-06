@@ -60,13 +60,11 @@ if __name__ == '__main__':
         d_model.load_state_dict(checkpoint['model_d'])
         d_optim.load_state_dict(checkpoint['optim_d'])
         step = checkpoint['step']
-        last_epoch = checkpoint['epoch']
+        last_epoch = checkpoint.get('epoch', None)
         print(f'Loaded model with step {step}')
     except Exception as e:
         'Initializing model from scratch.'
 
-    scheduler_g = torch.optim.lr_scheduler.ExponentialLR(g_optim, gamma=train_cfg['lr_decay'], last_epoch=last_epoch)
-    scheduler_d = torch.optim.lr_scheduler.ExponentialLR(d_optim, gamma=train_cfg['lr_decay'], last_epoch=last_epoch)
 
     train_cfg = config['training']
     dataloader = new_dataloader(data_path=train_data_path, segment_len=train_cfg['segment_len'],
@@ -77,6 +75,12 @@ if __name__ == '__main__':
                                     num_workers=train_cfg['num_workers'], sample_rate=audio.sample_rate)
     val_dataset = AudioDataset(data_path=val_data_path, segment_len=None, hop_len=audio.hop_length,
                                sample_rate=audio.sample_rate)
+
+    if last_epoch is None:
+        last_epoch = step // len(dataloader)
+
+    scheduler_g = torch.optim.lr_scheduler.ExponentialLR(g_optim, gamma=train_cfg['lr_decay'], last_epoch=last_epoch)
+    scheduler_d = torch.optim.lr_scheduler.ExponentialLR(d_optim, gamma=train_cfg['lr_decay'], last_epoch=last_epoch)
 
     stft = partial(stft, n_fft=1024, hop_length=256, win_length=1024)
 
