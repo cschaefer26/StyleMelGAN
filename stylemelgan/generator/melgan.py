@@ -266,7 +266,7 @@ class Generator(nn.Module):
 
         self.res_stack = nn.ModuleList()
 
-        c1, c2, c3, c4, c5 = [128, 64, 32, 16, 8]
+        c1, c2, c3, c4, c5 = [128, 64, 32, 32, 32]
 
         self.conv_pre = \
             nn.utils.weight_norm(nn.Conv1d(64, c1, 7, padding=3, padding_mode='reflect'))
@@ -277,28 +277,20 @@ class Generator(nn.Module):
             cond_hop_length=8, kpnet_conv_size=3
         )
 
-        self.res_1 = ResStack(c2, num_layers=5)
-
         self.up_2 = LVCBlock(
             c2, c3, 80, stride=8, dilations=[1, 3, 9, 27, 81], lReLU_slope=0.2,
             cond_hop_length=64, kpnet_conv_size=3
         )
-
-        self.res_2 = ResStack(c3, num_layers=7)
 
         self.up_3 = LVCBlock(
             c3, c4, 80, stride=2, dilations=[1, 3, 9, 27, 81], lReLU_slope=0.2,
             cond_hop_length=128, kpnet_conv_size=3
         )
 
-        self.res_3 = ResStack(c4, num_layers=8)
-
         self.up_4 = LVCBlock(
             c4, c5, 80, stride=2, dilations=[1, 3, 9, 27, 81], lReLU_slope=0.2,
             cond_hop_length=256, kpnet_conv_size=3
         )
-
-        self.res_4 = ResStack(c5, num_layers=9)
 
         self.conv_post = nn.Sequential(
             nn.LeakyReLU(0.2),
@@ -318,13 +310,9 @@ class Generator(nn.Module):
         z = self.conv_pre(z)                # (B, c_g, L)
 
         z = self.up_1(z, c)
-        z = self.res_1(z)
         z = self.up_2(z, c)
-        z = self.res_2(z)
         z = self.up_3(z, c)
-        z = self.res_3(z)
         z = self.up_4(z, c)
-        z = self.res_4(z)
 
         z = self.conv_post(z)               # (B, 1, L * 256)
 
