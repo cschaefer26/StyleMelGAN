@@ -63,6 +63,7 @@ if __name__ == '__main__':
         last_epoch = checkpoint.get('epoch', None)
         print(f'Loaded model with step {step}')
     except Exception as e:
+        print(e)
         'Initializing model from scratch.'
 
     train_cfg = config['training']
