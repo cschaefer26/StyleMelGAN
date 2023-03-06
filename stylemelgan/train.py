@@ -65,7 +65,6 @@ if __name__ == '__main__':
     except Exception as e:
         'Initializing model from scratch.'
 
-
     train_cfg = config['training']
     dataloader = new_dataloader(data_path=train_data_path, segment_len=train_cfg['segment_len'],
                                 hop_len=audio.hop_length, batch_size=train_cfg['batch_size'],
@@ -79,8 +78,12 @@ if __name__ == '__main__':
     if last_epoch is None:
         last_epoch = step // len(dataloader)
 
-    scheduler_g = torch.optim.lr_scheduler.ExponentialLR(g_optim, gamma=train_cfg['lr_decay'], last_epoch=last_epoch)
-    scheduler_d = torch.optim.lr_scheduler.ExponentialLR(d_optim, gamma=train_cfg['lr_decay'], last_epoch=last_epoch)
+    scheduler_g = torch.optim.lr_scheduler.ExponentialLR(g_optim, gamma=train_cfg['lr_decay'])
+    scheduler_d = torch.optim.lr_scheduler.ExponentialLR(d_optim, gamma=train_cfg['lr_decay'])
+
+    for e in range(last_epoch):
+        scheduler_g.step()
+        scheduler_d.step()
 
     stft = partial(stft, n_fft=1024, hop_length=256, win_length=1024)
 

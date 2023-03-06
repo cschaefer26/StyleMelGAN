@@ -1,5 +1,5 @@
 model_type: 'melgan'
-model_name: 'bild_aug'
+model_name: 'bild_scheduler'
 
 paths:
   train_dir: '/Users/cschaefe/datasets/bild_melgan_small'
