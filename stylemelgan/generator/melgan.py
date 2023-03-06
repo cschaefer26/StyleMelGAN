@@ -171,7 +171,6 @@ class LVCBlock(torch.nn.Module):
             kpnet_nonlinear_activation_params={"negative_slope":lReLU_slope}
         )
 
-
         self.convt_pre = nn.Sequential(
             nn.LeakyReLU(lReLU_slope),
             nn.utils.weight_norm(nn.ConvTranspose1d(in_channels, out_channels, 2 * stride, stride=stride, padding=stride // 2 + stride % 2, output_padding=stride % 2)),
@@ -186,6 +185,10 @@ class LVCBlock(torch.nn.Module):
                     nn.LeakyReLU(lReLU_slope),
                 )
             )
+
+        self.res_blocks = nn.ModuleList([
+            nn.utils.weight_norm(nn.Conv1d(out_channels, out_channels, 1)) for _ in dilations
+        ])
 
     def forward(self, x, c):
         ''' forward propagation of the location-variable convolutions.
@@ -203,14 +206,14 @@ class LVCBlock(torch.nn.Module):
         _, out_channels, _ = x.shape
         kernels, bias = self.kernel_predictor(c)
 
-        for i, conv in enumerate(self.conv_blocks):
+        for i, (conv, res_block) in enumerate(zip(self.conv_blocks, self.res_blocks)):
             output = conv(x)                # (B, c_g, stride * L')
 
             k = kernels[:, i, :, :, :, :]   # (B, 2 * c_g, c_g, kernel_size, cond_length)
             b = bias[:, i, :, :]            # (B, 2 * c_g, cond_length)
 
             output = self.location_variable_convolution(output, k, b, hop_size=self.cond_hop_length)    # (B, 2 * c_g, stride * L'): LVC
-            x = x + torch.sigmoid(output[ :, :out_channels, :]) * torch.tanh(output[:, out_channels:, :]) # (B, c_g, stride * L'): GAU
+            x = res_block(x) + torch.sigmoid(output[ :, :out_channels, :]) * torch.tanh(output[:, out_channels:, :]) # (B, c_g, stride * L'): GAU
 
         return x
 
