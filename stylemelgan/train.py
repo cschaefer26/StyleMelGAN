@@ -171,15 +171,18 @@ if __name__ == '__main__':
                 val_spec_loss /= len(val_dataloader)
                 summary_writer.add_scalar('val_stft_norm_loss', val_norm_loss, global_step=step)
                 summary_writer.add_scalar('val_stft_spec_loss', val_spec_loss, global_step=step)
+
+
                 if val_norm_loss + val_spec_loss < best_stft:
                     best_stft = val_norm_loss + val_spec_loss
+                    best_model_name = f'best_model_{model_name}_{best_stft:.2f}.pt'
                     print(f'\nnew best stft: {best_stft}')
                     torch.save({
                         'model_g': g_model.state_dict(),
                         'config': config,
                         'step': step,
                         'epoch': epoch
-                    }, f'checkpoints/best_model_{model_name}.pt')
+                    }, f'checkpoints/{best_model_name}.pt')
                     summary_writer.add_audio('best_generated', val_wav_f.detach().cpu().numpy(), sample_rate=audio.sample_rate, global_step=step)
 
                 g_model.train()
