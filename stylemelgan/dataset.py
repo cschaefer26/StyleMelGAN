@@ -101,6 +101,9 @@ class AudioDataset(Dataset):
                 audio = audio[:, audio_start:audio_start+self.segment_len]
             else:
                 audio = torch.nn.functional.pad(audio, (0, self.segment_len - audio.size(1)), 'constant')
+        else:
+            if audio.size(1) < 20000:
+                audio = torch.nn.functional.pad(audio, (0, 20000 - audio.size(1)), 'constant')
 
         mel = mel_spectrogram(audio, 1024, 80,
                               22050, 256, 1024, 0, 8000,
