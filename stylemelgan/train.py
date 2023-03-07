@@ -160,7 +160,8 @@ if __name__ == '__main__':
                         wav_f = g_model(val_mel).squeeze(0)
                     wav_r = val_data['wav'].squeeze(0).to(device)
                     size = min(wav_r.size(-1), wav_f.size(-1))
-                    val_n, val_s = multires_stft_loss(wav_f[..., :size], wav_r[..., :size])
+                    with torch.no_grad():
+                        val_n, val_s = multires_stft_loss(wav_f[..., :size], wav_r[..., :size])
                     val_norm_loss += val_n
                     val_spec_loss += val_s
                     if val_wav_r is None or wav_r.size(-1) > val_wav_r.size(-1):
@@ -171,7 +172,6 @@ if __name__ == '__main__':
                 val_spec_loss /= len(val_dataloader)
                 summary_writer.add_scalar('val_stft_norm_loss', val_norm_loss, global_step=step)
                 summary_writer.add_scalar('val_stft_spec_loss', val_spec_loss, global_step=step)
-
 
                 if val_norm_loss + val_spec_loss < best_stft:
                     best_stft = val_norm_loss + val_spec_loss
