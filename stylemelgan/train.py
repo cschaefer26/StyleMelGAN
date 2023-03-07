@@ -28,6 +28,7 @@ def plot_mel(mel: np.array) -> Figure:
 
 
 if __name__ == '__main__':
+
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=str,
                         default='stylemelgan/configs/melgan_config.yaml', help='points to config.yaml')
@@ -113,8 +114,8 @@ if __name__ == '__main__':
                 d_fake = d_model(wav_fake.detach())
                 d_real = d_model(wav_real)
                 for (_, score_fake), (_, score_real) in zip(d_fake, d_real):
-                    d_loss += torch.mean(torch.sum(torch.pow(score_real - 1.0, 2), dim=[1, 2]))
-                    d_loss += torch.mean(torch.sum(torch.pow(score_fake, 2), dim=[1, 2]))
+                    d_loss += torch.mean(torch.pow(score_real - 1.0, 2))
+                    d_loss += torch.mean(torch.pow(score_fake, 2))
                 d_optim.zero_grad()
                 d_loss.backward()
                 d_optim.step()
@@ -122,11 +123,9 @@ if __name__ == '__main__':
                 # generator
                 d_fake = d_model(wav_fake)
                 for (feat_fake, score_fake), (feat_real, _) in zip(d_fake, d_real):
-                    g_loss += torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
-                    for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
-                        g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
+                    g_loss += torch.mean(torch.pow(score_fake - 1.0, 2))
 
-            factor = 1. if step < pretraining_steps else 0.
+            factor = 2.5 if step < pretraining_steps else 2.5
 
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
             g_loss_all = g_loss + factor * (stft_norm_loss + stft_spec_loss)
@@ -209,3 +208,5 @@ if __name__ == '__main__':
             'step': step,
             'epoch': epoch
         }, f'checkpoints/latest_model__{model_name}.pt')
+
+
