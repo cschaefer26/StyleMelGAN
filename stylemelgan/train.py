@@ -58,8 +58,8 @@ if __name__ == '__main__':
 
     try:
         checkpoint = torch.load(f'checkpoints/latest_model__{model_name}.pt', map_location=device)
-        g_model.load_state_dict(checkpoint['model_g'])
-        g_optim.load_state_dict(checkpoint['optim_g'])
+        g_model.load_state_dict(checkpoint['g_model_g'])
+        g_optim.load_state_dict(checkpoint['g_optim_g'])
         d_model.load_state_dict(checkpoint['model_d'])
         d_optim.load_state_dict(checkpoint['optim_d'])
         step = checkpoint['step']
@@ -101,8 +101,8 @@ if __name__ == '__main__':
                 d_fake = d_model(wav_fake.detach())
                 d_real = d_model(wav_real)
                 for (_, score_fake), (_, score_real) in zip(d_fake, d_real):
-                    d_loss += torch.mean(torch.sum(torch.pow(score_real - 1.0, 2), dim=[1, 2]))
-                    d_loss += torch.mean(torch.sum(torch.pow(score_fake, 2), dim=[1, 2]))
+                    d_loss += torch.mean(torch.pow(score_real - 1.0, 2))
+                    d_loss += torch.mean(torch.pow(score_fake, 2))
                 d_optim.zero_grad()
                 d_loss.backward()
                 d_optim.step()
@@ -110,11 +110,11 @@ if __name__ == '__main__':
                 # generator
                 d_fake = d_model(wav_fake)
                 for (feat_fake, score_fake), (feat_real, _) in zip(d_fake, d_real):
-                    g_loss += torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
-                    for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
-                        g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
+                    g_loss += torch.mean(torch.pow(score_fake - 1.0, 2))
+                    #for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
+                    #    g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
-            factor = 1. if step < pretraining_steps else 0.
+            factor = 1. if step < pretraining_steps else 2.5
 
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
             g_loss_all = g_loss + factor * (stft_norm_loss + stft_spec_loss)
