@@ -4,6 +4,7 @@ import argparse
 import matplotlib as mpl
 import torch
 import torch.nn.functional as F
+import torchaudio
 import tqdm
 from matplotlib.figure import Figure
 from torch.cuda import is_available
@@ -87,6 +88,7 @@ if __name__ == '__main__':
         scheduler_d.step()
 
     stft = partial(stft, n_fft=1024, hop_length=256, win_length=1024)
+    mfcc_transform = torchaudio.transforms.MFCC(sample_rate=22050, n_mfcc=40)
 
     pretraining_steps = train_cfg['pretraining_steps']
 
@@ -126,10 +128,16 @@ if __name__ == '__main__':
                     for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
                         g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
-            factor = 1. if step < pretraining_steps else 0.
+            factor_stft = 0
+            factor_mfcc = 1. if step < pretraining_steps else 1.
+
+            mfcc_real = mfcc_transform(wav_real.squeeze(1))
+            mfcc_fake = mfcc_transform(wav_fake.squeeze(1))
+            mfcc_loss = F.l1_loss(mfcc_fake, mfcc_real)
 
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
-            g_loss_all = g_loss + factor * (stft_norm_loss + stft_spec_loss)
+
+            g_loss_all = g_loss + factor_stft * (stft_norm_loss + stft_spec_loss) + factor_mfcc * mfcc_loss
 
             g_optim.zero_grad()
             g_loss_all.backward()
@@ -139,13 +147,16 @@ if __name__ == '__main__':
                                       f'| g_loss: {g_loss:#.4} '
                                       f'| d_loss: {d_loss:#.4} '
                                       f'| stft_norm_loss {stft_norm_loss:#.4} '
-                                      f'| stft_spec_loss {stft_spec_loss:#.4} ', refresh=True)
+                                      f'| stft_norm_loss {stft_norm_loss:#.4} '
+                                      f'| mfcc_losss {mfcc_loss:#.4} ',
+                                 refresh=True)
 
             summary_writer.add_scalar('params/generator_lr', scheduler_g.get_last_lr()[0], global_step=step)
             summary_writer.add_scalar('params/discriminator_lr', scheduler_d.get_last_lr()[0], global_step=step)
             summary_writer.add_scalar('generator_loss', g_loss, global_step=step)
             summary_writer.add_scalar('stft_norm_loss', stft_norm_loss, global_step=step)
             summary_writer.add_scalar('stft_spec_loss', stft_spec_loss, global_step=step)
+            summary_writer.add_scalar('mfcc_loss', mfcc_loss, global_step=step)
             summary_writer.add_scalar('discriminator_loss', d_loss, global_step=step)
 
             if step % train_cfg['eval_steps'] == 0:

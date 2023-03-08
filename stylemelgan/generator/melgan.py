@@ -1,6 +1,7 @@
 from typing import Tuple, Dict, Any
 
 import torch
+import torchaudio.transforms
 from torch.nn import Module, ModuleList, Sequential, LeakyReLU, Tanh
 
 from stylemelgan.common import WNConv1d, WNConvTranspose1d
@@ -133,8 +134,11 @@ if __name__ == '__main__':
     for i in range(1):
         y = model(x)
     dur = time.time() - start
-
     print('dur ', dur)
+
+    transform = torchaudio.transforms.MFCC(sample_rate=22050, n_mfcc=40)
+    mfcc = transform(torch.randn(3, 10000))
+    print(mfcc.size())
 
     #y = model(x)
     #print(y.shape)
