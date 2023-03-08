@@ -130,9 +130,9 @@ if __name__ == '__main__':
                 # discriminator
                 c_fake = c_model(wav_fake.detach())
                 c_real = c_model(wav_real)
-                for (_, score_fake), (_, score_real) in zip(c_fake, c_real):
-                    c_loss += torch.mean(torch.sum(torch.pow(score_real - 1.0, 2), dim=[1, 2]))
-                    c_loss += torch.mean(torch.sum(torch.pow(score_fake, 2), dim=[1, 2]))
+                (_, score_fake), (_, score_real) = c_fake, c_real
+                c_loss += torch.mean(torch.sum(torch.pow(score_real - 1.0, 2), dim=[1, 2]))
+                c_loss += torch.mean(torch.sum(torch.pow(score_fake, 2), dim=[1, 2]))
                 c_optim.zero_grad()
                 c_loss.backward()
                 c_optim.step()
@@ -145,9 +145,9 @@ if __name__ == '__main__':
                         g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
                 # generator
-                d_fake = d_model(wav_fake)
-                for (feat_fake, score_fake), (feat_real, _) in zip(c_fake, c_real):
-                    g_loss += torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
+                c_fake = c_model(wav_fake)
+                (_, score_fake), (_, score_real) = c_fake, c_real
+                g_loss += torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
 
             factor_stft= 1. if step < pretraining_steps else 1.
 
@@ -172,7 +172,7 @@ if __name__ == '__main__':
             summary_writer.add_scalar('generator_loss', g_loss, global_step=step)
             summary_writer.add_scalar('stft_norm_loss', stft_norm_loss, global_step=step)
             summary_writer.add_scalar('stft_spec_loss', stft_spec_loss, global_step=step)
-            summary_writer.add_scalar('mfcc_loss', mfcc_loss, global_step=step)
+            summary_writer.add_scalar('disc_mfcc_loss', c_loss, global_step=step)
             summary_writer.add_scalar('discriminator_loss', d_loss, global_step=step)
 
             if step % train_cfg['eval_steps'] == 0:
