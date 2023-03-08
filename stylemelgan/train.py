@@ -127,8 +127,8 @@ if __name__ == '__main__':
                     for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
                         g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
-                p_fake = p_model(wav_fake)
-                pitch_loss_fake = F.l1_loss(p_fake, pitch_orig)
+            p_fake = p_model(wav_fake)
+            pitch_loss_fake = F.l1_loss(p_fake, pitch_orig)
 
             factor = 1. if step < pretraining_steps else 0.
 
