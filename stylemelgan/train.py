@@ -88,7 +88,7 @@ if __name__ == '__main__':
         scheduler_d.step()
 
     stft = partial(stft, n_fft=1024, hop_length=256, win_length=1024)
-    mfcc_transform = torchaudio.transforms.MFCC(sample_rate=22050, n_mfcc=40)
+    mfcc_transform = torchaudio.transforms.MFCC(sample_rate=22050, n_mfcc=40).to(device)
 
     pretraining_steps = train_cfg['pretraining_steps']
 
