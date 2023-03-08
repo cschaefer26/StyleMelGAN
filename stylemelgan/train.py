@@ -149,7 +149,7 @@ if __name__ == '__main__':
                 (_, score_fake), (_, score_real) = c_fake, c_real
                 g_loss += torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
 
-            factor_stft= 1. if step < pretraining_steps else 1.
+            factor_stft= 1. if step < pretraining_steps else 0.
 
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
 
