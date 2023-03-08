@@ -49,8 +49,8 @@ if __name__ == '__main__':
     d_model = MultiScaleDiscriminator().to(device)
     train_cfg = config['training']
 
-    g_optim = torch.optim.Adam(g_model.parameters(), lr=train_cfg['g_lr'], betas=(0.8, 0.99))
-    d_optim = torch.optim.Adam(d_model.parameters(), lr=train_cfg['d_lr'], betas=(0.8, 0.99))
+    g_optim = torch.optim.AdamW(g_model.parameters(), lr=train_cfg['g_lr'], betas=(0.8, 0.99))
+    d_optim = torch.optim.AdamW(d_model.parameters(), lr=train_cfg['d_lr'], betas=(0.8, 0.99))
     multires_stft_loss = MultiResStftLoss().to(device)
     last_epoch = -1
 
