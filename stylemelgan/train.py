@@ -11,7 +11,7 @@ from torch.cuda import is_available
 from torch.utils.tensorboard import SummaryWriter
 from stylemelgan.audio import Audio
 from stylemelgan.dataset import new_dataloader, AudioDataset
-from stylemelgan.discriminator import MultiScaleDiscriminator
+from stylemelgan.discriminator import MultiScaleDiscriminator, CepDiscriminator
 from stylemelgan.generator.melgan import Generator
 from stylemelgan.losses import stft, MultiResStftLoss
 from stylemelgan.utils import read_config
@@ -47,10 +47,12 @@ if __name__ == '__main__':
 
     g_model = Generator(audio.n_mels).to(device)
     d_model = MultiScaleDiscriminator().to(device)
+    c_model = CepDiscriminator().to(device)
     train_cfg = config['training']
 
     g_optim = torch.optim.AdamW(g_model.parameters(), lr=train_cfg['g_lr'], betas=(0.8, 0.99))
     d_optim = torch.optim.AdamW(d_model.parameters(), lr=train_cfg['d_lr'], betas=(0.8, 0.99))
+    c_optim = torch.optim.AdamW(c_model.parameters(), lr=train_cfg['d_lr'], betas=(0.8, 0.99))
     multires_stft_loss = MultiResStftLoss().to(device)
     last_epoch = -1
 
@@ -60,6 +62,8 @@ if __name__ == '__main__':
         g_optim.load_state_dict(checkpoint['optim_g'])
         d_model.load_state_dict(checkpoint['model_d'])
         d_optim.load_state_dict(checkpoint['optim_d'])
+        c_model.load_state_dict(checkpoint['model_c'])
+        c_optim.load_state_dict(checkpoint['optim_c'])
         step = checkpoint['step']
         last_epoch = checkpoint.get('epoch', None)
         print(f'Loaded model with step {step}')
@@ -82,13 +86,14 @@ if __name__ == '__main__':
 
     scheduler_g = torch.optim.lr_scheduler.ExponentialLR(g_optim, gamma=train_cfg['lr_decay'])
     scheduler_d = torch.optim.lr_scheduler.ExponentialLR(d_optim, gamma=train_cfg['lr_decay'])
+    scheduler_c = torch.optim.lr_scheduler.ExponentialLR(c_optim, gamma=train_cfg['lr_decay'])
 
     for e in range(last_epoch):
         scheduler_g.step()
         scheduler_d.step()
+        scheduler_c.step()
 
     stft = partial(stft, n_fft=1024, hop_length=256, win_length=1024)
-    mfcc_transform = torchaudio.transforms.MFCC(sample_rate=22050, n_mfcc=40).to(device)
 
     pretraining_steps = train_cfg['pretraining_steps']
 
@@ -106,6 +111,7 @@ if __name__ == '__main__':
             wav_fake = g_model(mel)[:, :, :train_cfg['segment_len']]
 
             d_loss = 0.0
+            c_loss = 0.0
             g_loss = 0.0
             stft_norm_loss = 0.0
             stft_spec_loss = 0.0
@@ -121,6 +127,16 @@ if __name__ == '__main__':
                 d_loss.backward()
                 d_optim.step()
 
+                # discriminator
+                c_fake = c_model(wav_fake.detach())
+                c_real = c_model(wav_real)
+                for (_, score_fake), (_, score_real) in zip(c_fake, c_real):
+                    c_loss += torch.mean(torch.sum(torch.pow(score_real - 1.0, 2), dim=[1, 2]))
+                    c_loss += torch.mean(torch.sum(torch.pow(score_fake, 2), dim=[1, 2]))
+                c_optim.zero_grad()
+                c_loss.backward()
+                c_optim.step()
+
                 # generator
                 d_fake = d_model(wav_fake)
                 for (feat_fake, score_fake), (feat_real, _) in zip(d_fake, d_real):
@@ -128,16 +144,16 @@ if __name__ == '__main__':
                     for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
                         g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
-            factor_stft = 0
-            factor_mfcc = 1. if step < pretraining_steps else 1.
+                # generator
+                d_fake = d_model(wav_fake)
+                for (feat_fake, score_fake), (feat_real, _) in zip(c_fake, c_real):
+                    g_loss += torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
 
-            mfcc_real = mfcc_transform(wav_real.squeeze(1))
-            mfcc_fake = mfcc_transform(wav_fake.squeeze(1))
-            mfcc_loss = F.l1_loss(mfcc_fake, mfcc_real)
+            factor_stft= 1. if step < pretraining_steps else 1.
 
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
 
-            g_loss_all = g_loss + factor_stft * (stft_norm_loss + stft_spec_loss) + factor_mfcc * mfcc_loss
+            g_loss_all = g_loss + factor_stft * (stft_norm_loss + stft_spec_loss)
 
             g_optim.zero_grad()
             g_loss_all.backward()
@@ -148,7 +164,7 @@ if __name__ == '__main__':
                                       f'| d_loss: {d_loss:#.4} '
                                       f'| stft_norm_loss {stft_norm_loss:#.4} '
                                       f'| stft_norm_loss {stft_norm_loss:#.4} '
-                                      f'| mfcc_losss {mfcc_loss:#.4} ',
+                                      f'| c_losss {c_loss:#.4} ',
                                  refresh=True)
 
             summary_writer.add_scalar('params/generator_lr', scheduler_g.get_last_lr()[0], global_step=step)

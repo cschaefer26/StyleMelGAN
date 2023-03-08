@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torchaudio.transforms
 from torch.nn import Sequential, LeakyReLU
 
 from stylemelgan.common import WNConv1d
@@ -12,6 +13,35 @@ class Identity(nn.Module):
     def forward(self, x):
         return x
 
+
+class CepDiscriminator(nn.Module):
+
+    def __init__(self):
+        super().__init__()
+        self.transform = torchaudio.transforms.MFCC(sample_rate=22050, n_mfcc=40)
+
+        self.discriminator = nn.ModuleList([
+            nn.Sequential(
+                nn.ReflectionPad1d(7),
+                nn.utils.weight_norm(nn.Conv1d(40, 512, kernel_size=3, stride=1, padding=1)),
+                nn.LeakyReLU(0.2, inplace=True),
+            ),
+            nn.Sequential(
+                nn.utils.weight_norm(nn.Conv1d(512, 512, kernel_size=3, stride=1, padding=1)),
+                nn.LeakyReLU(0.2, inplace=True),
+            ),
+            nn.Sequential(
+                nn.utils.weight_norm(nn.Conv1d(512, 1, kernel_size=3, stride=1, padding=1)),
+                nn.LeakyReLU(0.2, inplace=True),
+            )])
+
+    def forward(self, x):
+        x = self.transform(x.squeeze(1))
+        features = list()
+        for module in self.discriminator:
+            x = module(x)
+            features.append(x)
+        return features[:-1], features[-1]
 
 class Discriminator(nn.Module):
     def __init__(self):
@@ -85,7 +115,7 @@ class MultiScaleDiscriminator(nn.Module):
 
 
 if __name__ == '__main__':
-    model = Discriminator()
+    model = CepDiscriminator()
 
     x = torch.randn(3, 1, 22050)
     print(x.shape)
