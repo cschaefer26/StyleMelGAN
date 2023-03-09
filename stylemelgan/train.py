@@ -134,7 +134,7 @@ if __name__ == '__main__':
             wav_pred_fake = g_model(mel_pred)
             mel_fake = mel_spectrogram(wav_pred_fake.squeeze(1), n_fft=1024, num_mels=80, sampling_rate=22050, hop_size=256,
                                        win_size=1024, fmin=0, fmax=8000)
-            mel_pred_loss = F.l1_loss(mel_fake, mel_pred)
+            mel_pred_loss = 10. * F.l1_loss(mel_fake, mel_pred)
             g_optim.zero_grad()
             mel_pred_loss.backward()
             g_optim.step()
@@ -197,9 +197,10 @@ if __name__ == '__main__':
                 mel_real = audio.wav_to_mel(wav_real)
                 mel_fake_plot = plot_mel(mel_fake)
                 mel_real_plot = plot_mel(mel_real)
-                mel_input_plot = plot_mel(mel_val.cpu().squeeze().numpy())
                 summary_writer.add_figure('mel_generated', mel_fake_plot, global_step=step)
                 summary_writer.add_figure('mel_target', mel_real_plot, global_step=step)
+
+                mel_input_plot = plot_mel(mel_val.cpu().squeeze().numpy())
                 summary_writer.add_figure('mel_input', mel_input_plot, global_step=step)
 
         # epoch end

@@ -125,6 +125,20 @@ class Generator(nn.Module):
 
 
 if __name__ == '__main__':
+    import matplotlib.pyplot as plt
+
+    def plot_mel(mel: np.array):
+        mel = np.flip(mel, axis=0)
+        fig = plt.figure(figsize=(12, 6), dpi=150)
+        plt.imshow(mel, interpolation='nearest', aspect='auto')
+        return fig
+    mel = torch.load('/Users/cschaefe/datasets/stylemelgan_welt_fuckup/welt_fuckup.mel')
+
+    plot_mel(mel.squeeze().cpu().numpy())
+
+    plt.show()
+
+    exit()
     import time
     config = read_config('../configs/melgan_config.yaml')
     model = Generator(80)

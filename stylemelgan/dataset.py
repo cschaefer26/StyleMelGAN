@@ -102,6 +102,7 @@ class MelDataset(Dataset):
             mel = mel[:, mel_start:mel_end]
         return {'mel': mel}
 
+
 class AudioDataset(Dataset):
 
     def __init__(self,
@@ -125,24 +126,40 @@ class AudioDataset(Dataset):
 
     def __getitem__(self, item_id: int) -> Dict[str, torch.Tensor]:
         file_id = self.file_ids[item_id]
+        mel_path = self.data_path / f'{file_id}.mel'
         wav_path = self.data_path / f'{file_id}.wav'
+        pitch_path = self.data_path / f'{file_id}.pitch'
         wav, _ = librosa.load(wav_path, sr=self.sample_rate)
-        max_scale = min(0.95 / np.max(wav), 1.5)
-        audio = torch.tensor(wav).float().unsqueeze(0)
+        wav = torch.tensor(wav).float()
+        mel = torch.load(mel_path).squeeze(0)
+        pitch = torch.load(pitch_path).float()
+
         if self.segment_len is not None:
-            audio = audio * float(np.random.uniform(low=0.5, high=max_scale))
-            if audio.size(1) >= self.segment_len:
-                max_audio_start = audio.size(1) - self.segment_len
-                audio_start = random.randint(0, max_audio_start)
-                audio = audio[:, audio_start:audio_start+self.segment_len]
-            else:
-                audio = torch.nn.functional.pad(audio, (0, self.segment_len - audio.size(1)), 'constant')
+            mel_pad_len = 2 * self.mel_segment_len - mel.size(-1)
+            if mel_pad_len > 0:
+                mel_pad = torch.full((mel.size(0), mel_pad_len), fill_value=self.padding_val)
+                mel = torch.cat([mel, mel_pad], dim=-1)
+                pitch_pad = torch.full((mel_pad_len, ), fill_value=0)
+                pitch = torch.cat([pitch, pitch_pad], dim=0)
 
-        mel = mel_spectrogram(audio, 1024, 80,
-                              22050, 256, 1024, 0, 8000,
-                              center=False)
+            wav_pad_len = mel.size(-1) * self.hop_len - wav.size(0)
+            if wav_pad_len > 0:
+                wav_pad = torch.zeros((wav_pad_len, ))
+                wav = torch.cat([wav, wav_pad], dim=0)
+            max_mel_start = mel.size(-1) - self.mel_segment_len
+            mel_start = random.randint(0, max_mel_start)
+            mel_end = mel_start + self.mel_segment_len
+            mel = mel[:, mel_start:mel_end]
+            wav_start = mel_start * self.hop_len
+            wav_end = wav_start + self.segment_len
+            wav = wav[wav_start:wav_end]
+            wav = wav + (1 / 32768) * torch.randn_like(wav)
+            pitch = pitch[mel_start:mel_end]
+        wav = wav.unsqueeze(0)
+        pitch = pitch.unsqueeze(0)
+        #print(pitch)
+        return {'mel': mel, 'wav': wav, 'pitch': pitch}
 
-        return {'mel': mel.squeeze(), 'wav': audio}
 
 
 def new_mel_dataloader(data_path: Path,
