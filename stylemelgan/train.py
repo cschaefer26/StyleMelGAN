@@ -104,7 +104,7 @@ if __name__ == '__main__':
             pitch_loss_fake = 0.0
 
             p_real = p_model(wav_real)
-            pitch_loss_real = F.l1_loss(p_real, pitch_orig)
+            pitch_loss_real = F.l1_loss(p_real[:, :, pitch_orig.size(-1)], pitch_orig)
             p_optim.zero_grad()
             pitch_loss_real.backward()
             p_optim.step()
@@ -128,7 +128,7 @@ if __name__ == '__main__':
                         g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
             p_fake = p_model(wav_fake)
-            pitch_loss_fake = F.l1_loss(p_fake, pitch_orig)
+            pitch_loss_fake = F.l1_loss(p_fake[:, :, pitch_orig.size(-1)], pitch_orig)
 
             factor = 1. if step < pretraining_steps else 0.
 
