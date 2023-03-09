@@ -10,7 +10,7 @@ from torch.cuda import is_available
 from torch.utils.tensorboard import SummaryWriter
 
 from stylemelgan.audio import Audio
-from stylemelgan.dataset import new_dataloader, AudioDataset
+from stylemelgan.dataset import new_dataloader, AudioDataset, mel_spectrogram, new_mel_dataloader
 from stylemelgan.discriminator import MultiScaleDiscriminator
 from stylemelgan.generator.melgan import Generator
 from stylemelgan.losses import stft, MultiResStftLoss
@@ -38,6 +38,7 @@ if __name__ == '__main__':
     model_name = config['model_name']
     audio = Audio.from_config(config)
     train_data_path = Path(config['paths']['train_dir'])
+    train_pred_data_path = Path(config['paths']['train_dir_mels'])
     val_data_path = Path(config['paths']['val_dir'])
 
     device = torch.device('cuda') if is_available() else torch.device('cpu')
@@ -71,6 +72,11 @@ if __name__ == '__main__':
     dataloader = new_dataloader(data_path=train_data_path, segment_len=train_cfg['segment_len'],
                                 hop_len=audio.hop_length, batch_size=train_cfg['batch_size'],
                                 num_workers=train_cfg['num_workers'], sample_rate=audio.sample_rate)
+
+    mel_dataloader = new_mel_dataloader(data_path=train_pred_data_path, segment_len=train_cfg['segment_len'],
+                                        hop_len=audio.hop_length, batch_size=train_cfg['batch_size'],
+                                        num_workers=train_cfg['num_workers'])
+
     val_dataset = AudioDataset(data_path=val_data_path, segment_len=None, hop_len=audio.hop_length,
                                sample_rate=audio.sample_rate)
 
@@ -83,11 +89,12 @@ if __name__ == '__main__':
     best_stft = 9999
 
     for epoch in range(train_cfg['epochs']):
-        pbar = tqdm.tqdm(enumerate(dataloader, 1), total=len(dataloader))
-        for i, data in pbar:
+        pbar = tqdm.tqdm(enumerate(zip(dataloader, mel_dataloader), 1), total=len(dataloader))
+        for i, (data, data_mel) in pbar:
             step += 1
             mel = data['mel'].to(device)
             wav_real = data['wav'].to(device)
+
 
             wav_fake = g_model(mel)[:, :, :train_cfg['segment_len']]
 
@@ -123,13 +130,25 @@ if __name__ == '__main__':
             g_loss_all.backward()
             g_optim.step()
 
+            mel_pred = data_mel['mel'].to(device)
+
+            wav_pred_fake = g_model(mel_pred)
+            mel_fake = mel_spectrogram(wav_pred_fake, n_fft=1024, num_mels=80, sampling_rate=22050, hop_size=256,
+                                       win_size=1024, fmin=0, fmax=8000)
+            mel_pred_loss = F.l1_loss(mel_fake, mel_pred)
+            g_optim.zero_grad()
+            mel_pred_loss.backward()
+            g_optim.step()
+
             pbar.set_description(desc=f'Epoch: {epoch} | Step {step} '
                                       f'| g_loss: {g_loss:#.4} '
                                       f'| d_loss: {d_loss:#.4} '
                                       f'| stft_norm_loss {stft_norm_loss:#.4} '
+                                      f'| mel_pred_loss {mel_pred_loss:#.4} '
                                       f'| stft_spec_loss {stft_spec_loss:#.4} ', refresh=True)
 
             summary_writer.add_scalar('generator_loss', g_loss, global_step=step)
+            summary_writer.add_scalar('generator_mel_pred_loss', mel_pred_loss, global_step=step)
             summary_writer.add_scalar('stft_norm_loss', stft_norm_loss, global_step=step)
             summary_writer.add_scalar('stft_spec_loss', stft_spec_loss, global_step=step)
             summary_writer.add_scalar('discriminator_loss', d_loss, global_step=step)

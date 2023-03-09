@@ -3,6 +3,7 @@ model_name: 'bild_aug'
 
 paths:
   train_dir: '/Users/cschaefe/datasets/bild_melgan_small'
+  train_dir_mels: '/Users/cschaefe/datasets/welt_mels_predicted'
   val_dir: '/Users/cschaefe/datasets/bild_melgan_small'
   checkpoints: 'stylemelgan/checkpoints'
 

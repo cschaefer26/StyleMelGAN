@@ -66,6 +66,42 @@ def mel_spectrogram(y, n_fft, num_mels, sampling_rate, hop_size, win_size, fmin,
     return spec
 
 
+
+
+class MelDataset(Dataset):
+
+    def __init__(self,
+                 data_path: Path,
+                 hop_len: int,
+                 segment_len: Union[int, None],
+                 padding_val: float = -11.5129) -> None:
+        mel_names = list(data_path.glob('**/*.mel'))
+        self.data_path = data_path
+        self.hop_len = hop_len
+        self.segment_len = segment_len
+        self.padding_val = padding_val
+        self.file_ids = [n.stem for n in mel_names]
+        if segment_len is not None:
+            self.mel_segment_len = segment_len // hop_len + 2
+
+    def __len__(self):
+        return len(self.file_ids)
+
+    def __getitem__(self, item_id: int) -> Dict[str, torch.Tensor]:
+        file_id = self.file_ids[item_id]
+        mel_path = self.data_path / f'{file_id}.mel'
+        mel = torch.load(mel_path)
+        if self.segment_len is not None:
+            mel_pad_len = 2 * self.mel_segment_len - mel.size(-1)
+            if mel_pad_len > 0:
+                mel_pad = torch.full((mel.size(0), mel_pad_len), fill_value=self.padding_val)
+                mel = torch.cat([mel, mel_pad], dim=-1)
+            max_mel_start = mel.size(-1) - self.mel_segment_len
+            mel_start = random.randint(0, max_mel_start)
+            mel_end = mel_start + self.mel_segment_len
+            mel = mel[:, mel_start:mel_end]
+        return {'mel': mel}
+
 class AudioDataset(Dataset):
 
     def __init__(self,
@@ -108,6 +144,17 @@ class AudioDataset(Dataset):
 
         return {'mel': mel.squeeze(), 'wav': audio}
 
+
+def new_mel_dataloader(data_path: Path,
+                       segment_len: int,
+                       hop_len: int,
+                       batch_size: int,
+                       num_workers: int = 0) -> DataLoader:
+
+    dataset = MelDataset(data_path=data_path, segment_len=segment_len, hop_len=hop_len)
+    dataloader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True,
+                            num_workers=num_workers, pin_memory=True, drop_last=True)
+    return dataloader
 
 def new_dataloader(data_path: Path,
                    segment_len: int,
