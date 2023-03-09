@@ -1,10 +1,10 @@
 model_type: 'melgan'
-model_name: 'bild_aug'
+model_name: 'welt_predtuning'
 
 paths:
-  train_dir: '/Users/cschaefe/datasets/bild_melgan_small'
+  train_dir: '/Users/cschaefe/datasets/stylemelgan_welt_train'
   train_dir_mels: '/Users/cschaefe/datasets/welt_mels_predicted'
-  val_dir: '/Users/cschaefe/datasets/bild_melgan_small'
+  val_dir: '/Users/cschaefe/datasets/stylemelgan_welt_fuckup'
   checkpoints: 'stylemelgan/checkpoints'
 
 audio:
