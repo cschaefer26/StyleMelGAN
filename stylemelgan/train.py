@@ -27,6 +27,10 @@ def plot_mel(mel: np.array) -> Figure:
     plt.imshow(mel, interpolation='nearest', aspect='auto')
     return fig
 
+def plot_pitch(pitch: np.array, color='gray') -> Figure:
+    fig = plt.figure(figsize=(12, 6), dpi=100)
+    plt.plot(pitch, color=color)
+    return fig
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -161,12 +165,13 @@ if __name__ == '__main__':
 
                 for i, val_data in enumerate(val_dataset):
                     val_mel = val_data['mel'].to(device)
+                    val_pitch = val_data['pitch'].to(device)
                     val_mel = val_mel.unsqueeze(0)
                     wav_fake = g_model.inference(val_mel).squeeze().cpu().numpy()
                     wav_real = val_data['wav'].detach().squeeze().cpu().numpy()
                     wav_f = torch.tensor(wav_fake).unsqueeze(0).to(device)
                     wav_r = torch.tensor(wav_real).unsqueeze(0).to(device)
-                    val_wavs.append((wav_fake, wav_real))
+                    val_wavs.append((wav_fake, wav_real, val_pitch))
                     size = min(wav_r.size(-1), wav_f.size(-1))
                     val_n, val_s = multires_stft_loss(wav_f[..., :size], wav_r[..., :size])
                     val_norm_loss += val_n
@@ -177,7 +182,7 @@ if __name__ == '__main__':
                 summary_writer.add_scalar('val_stft_norm_loss', val_norm_loss, global_step=step)
                 summary_writer.add_scalar('val_stft_spec_loss', val_spec_loss, global_step=step)
                 val_wavs.sort(key=lambda x: x[1].shape[0])
-                wav_fake, wav_real = val_wavs[-1]
+                wav_fake, wav_real, pitch_target = val_wavs[-1]
                 if val_norm_loss + val_spec_loss < best_stft:
                     best_stft = val_norm_loss + val_spec_loss
                     print(f'\nnew best stft: {best_stft}')
@@ -198,10 +203,22 @@ if __name__ == '__main__':
                 summary_writer.add_audio('target', wav_real, sample_rate=audio.sample_rate, global_step=step)
                 mel_fake = audio.wav_to_mel(wav_fake)
                 mel_real = audio.wav_to_mel(wav_real)
+
+                pitch_target_plot = plot_pitch(pitch_target.squeeze().cpu().numpy())
+                summary_writer.add_figure('pitch_target', pitch_target_plot, global_step=step)
+
+                with torch.no_grad():
+                    pitch_fake = p_model(torch.from_numpy(wav_fake).unsqueeze(0).unsqueeze(0).to(device))
+                    pitch_real = p_model(torch.from_numpy(wav_real).unsqueeze(0).unsqueeze(0).to(device))
+
+                pitch_fake_plot = plot_pitch(pitch_fake.squeeze().cpu().numpy())
+                pitch_real_plot = plot_pitch(pitch_real.squeeze().cpu().numpy())
                 mel_fake_plot = plot_mel(mel_fake)
                 mel_real_plot = plot_mel(mel_real)
                 summary_writer.add_figure('mel_generated', mel_fake_plot, global_step=step)
                 summary_writer.add_figure('mel_target', mel_real_plot, global_step=step)
+                summary_writer.add_figure('pitch_pred_fake', pitch_fake_plot, global_step=step)
+                summary_writer.add_figure('pitch_pred_real', pitch_real_plot, global_step=step)
 
         # epoch end
         torch.save({
