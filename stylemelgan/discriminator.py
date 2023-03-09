@@ -41,18 +41,36 @@ class PitchPredictor(nn.Module):
         super(PitchPredictor, self).__init__()
 
         self.convs = nn.Sequential(
-            WNConv1d(513, 512, kernel_size=3, stride=1, padding=1, padding_mode='reflect'),
-            LeakyReLU(relu_slope, inplace=True),
-            WNConv1d(512, 512, kernel_size=3, stride=1, padding=1),
-            LeakyReLU(relu_slope, inplace=True),
-            WNConv1d(512, 512, kernel_size=3, stride=1, padding=1)
+            Sequential(
+                WNConv1d(1, 16, kernel_size=15, stride=1, padding=7, padding_mode='reflect'),
+                LeakyReLU(relu_slope, inplace=True)
+            ),
+            Sequential(
+                WNConv1d(16, 64, kernel_size=41, stride=4, padding=20, groups=4),
+                LeakyReLU(relu_slope, inplace=True)
+            ),
+            Sequential(
+                WNConv1d(64, 256, kernel_size=41, stride=4, padding=20, groups=16),
+                LeakyReLU(relu_slope, inplace=True)
+            ),
+            Sequential(
+                WNConv1d(256, 1024, kernel_size=41, stride=4, padding=20, groups=64),
+                LeakyReLU(relu_slope, inplace=True)
+            ),
+            Sequential(
+                WNConv1d(1024, 1024, kernel_size=41, stride=4, padding=20, groups=256),
+                LeakyReLU(relu_slope, inplace=True)
+            ),
+            Sequential(
+                WNConv1d(1024, 1024, kernel_size=5, stride=1, padding=2),
+                LeakyReLU(relu_slope, inplace=True)
+            ),
         )
-        self.rnn = GRU(512, 256, bidirectional=True, batch_first=True)
+        self.rnn = GRU(1024, 256, bidirectional=True, batch_first=True)
         self.out_conv = WNConv1d(512, 1, 1)
 
     def forward(self, x):
-        x_stft = stft(x=x.squeeze(1), n_fft=1024, hop_length=256, win_length=1024)
-        x = self.convs(x_stft.transpose(1, 2))
+        x = self.convs(x)
         x, _ = self.rnn(x.transpose(1, 2))
         x = x.transpose(1, 2)
         x = self.out_conv(x)
