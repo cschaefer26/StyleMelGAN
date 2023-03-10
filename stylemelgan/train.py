@@ -232,6 +232,8 @@ if __name__ == '__main__':
             'optim_g': g_optim.state_dict(),
             'model_d': d_model.state_dict(),
             'optim_d': d_optim.state_dict(),
+            'model_c': c_model.state_dict(),
+            'optim_c': c_optim.state_dict(),
             'config': config,
             'step': step,
             'epoch': epoch
