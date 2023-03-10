@@ -67,6 +67,7 @@ if __name__ == '__main__':
     except Exception as e:
         'Initializing model from scratch.'
 
+    g_model.generator[1].requires_grad_(False)
     train_cfg = config['training']
     dataloader = new_dataloader(data_path=train_data_path, segment_len=train_cfg['segment_len'],
                                 hop_len=audio.hop_length, batch_size=train_cfg['batch_size'],
