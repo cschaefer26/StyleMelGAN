@@ -136,7 +136,23 @@ if __name__ == '__main__':
     dur = time.time() - start
     print('dur ', dur)
 
-    transform = torchaudio.transforms.MFCC(sample_rate=22050, n_mfcc=40)
+    transform = torchaudio.transforms.MFCC(sample_rate=22050)
+    import matplotlib.pyplot as plt
+
+    def plot_mel(mel: np.array):
+        mel = np.flip(mel, axis=0)
+        fig = plt.figure(figsize=(12, 6), dpi=150)
+        plt.imshow(mel, interpolation='nearest', aspect='auto')
+        return fig
+
+
+    import librosa
+    wav, _ = librosa.load('/Users/cschaefe/transient/welt_nofuckup.wav', sr=16000)
+    mfcc = transform(torch.from_numpy(wav))
+    plot_mel(mfcc.detach().numpy())
+    plt.savefig('/Users/cschaefe/transient/nofuckup_mfcc.png')
+
+    exit()
     mfcc = transform(torch.randn(3, 10000))
     print(mfcc.size())
 
