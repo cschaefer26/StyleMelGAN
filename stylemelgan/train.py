@@ -48,26 +48,26 @@ if __name__ == '__main__':
     g_model = Generator(audio.n_mels).to(device)
     d_model = MultiScaleDiscriminator().to(device)
     train_cfg = config['training']
-    g_optim = torch.optim.Adam(g_model.parameters(), lr=train_cfg['g_lr'], betas=(0.5, 0.9))
-    d_optim = torch.optim.Adam(d_model.parameters(), lr=train_cfg['d_lr'], betas=(0.5, 0.9))
-    for g in g_optim.param_groups:
-        g['lr'] = train_cfg['g_lr']
-    for g in d_optim.param_groups:
-        g['lr'] = train_cfg['d_lr']
     multires_stft_loss = MultiResStftLoss().to(device)
 
     try:
         checkpoint = torch.load(f'checkpoints/latest_model__{model_name}.pt', map_location=device)
         g_model.load_state_dict(checkpoint['model_g'])
-        g_optim.load_state_dict(checkpoint['optim_g'])
-        d_model.load_state_dict(checkpoint['model_d'])
-        d_optim.load_state_dict(checkpoint['optim_d'])
         step = checkpoint['step']
         print(f'Loaded model with step {step}')
     except Exception as e:
         'Initializing model from scratch.'
 
     g_model.generator[1].requires_grad_(False)
+    print(g_model.generator[1])
+
+    g_optim = torch.optim.Adam(g_model.parameters(), lr=train_cfg['g_lr'], betas=(0.5, 0.9))
+    d_optim = torch.optim.Adam(d_model.parameters(), lr=train_cfg['d_lr'], betas=(0.5, 0.9))
+    for g in g_optim.param_groups:
+        g['lr'] = train_cfg['g_lr']
+    for g in d_optim.param_groups:
+        g['lr'] = train_cfg['d_lr']
+
     train_cfg = config['training']
     dataloader = new_dataloader(data_path=train_data_path, segment_len=train_cfg['segment_len'],
                                 hop_len=audio.hop_length, batch_size=train_cfg['batch_size'],
