@@ -31,7 +31,7 @@ class CepDiscriminator(nn.Module):
                 nn.LeakyReLU(0.2, inplace=True),
             ),
             nn.Sequential(
-                nn.utils.weight_norm(nn.Conv1d(512, 1, kernel_size=7, padding=3)),
+                nn.utils.weight_norm(nn.Conv1d(512, 1, kernel_size=3, padding=1)),
             )])
 
     def forward(self, x):
