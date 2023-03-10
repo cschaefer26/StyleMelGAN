@@ -18,7 +18,7 @@ class CepDiscriminator(nn.Module):
 
     def __init__(self):
         super().__init__()
-        self.transform = torchaudio.transforms.MFCC(n_mfcc=40)
+        self.transform = torchaudio.transforms.MFCC(n_mfcc=40, sample_rate=22050)
 
         self.discriminator = nn.ModuleList([
             nn.Sequential(
