@@ -147,10 +147,10 @@ if __name__ == '__main__':
 
 
     import librosa
-    wav, _ = librosa.load('/Users/cschaefe/transient/welt_nofuckup.wav', sr=16000)
+    wav, _ = librosa.load('/Users/cschaefe/transient/welt_fuckup.wav', sr=16000)
     mfcc = transform(torch.from_numpy(wav))
     plot_mel(mfcc.detach().numpy())
-    plt.savefig('/Users/cschaefe/transient/nofuckup_mfcc.png')
+    plt.savefig('/Users/cschaefe/transient/fuckup_mfcc.png')
 
     exit()
     mfcc = transform(torch.randn(3, 10000))

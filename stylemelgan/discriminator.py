@@ -22,17 +22,16 @@ class CepDiscriminator(nn.Module):
 
         self.discriminator = nn.ModuleList([
             nn.Sequential(
-                nn.ReflectionPad1d(7),
-                nn.utils.weight_norm(nn.Conv1d(40, 512, kernel_size=3, stride=1, padding=1)),
+                nn.ReflectionPad1d(3),
+                nn.utils.weight_norm(nn.Conv1d(40, 512, kernel_size=7)),
                 nn.LeakyReLU(0.2, inplace=True),
             ),
             nn.Sequential(
-                nn.utils.weight_norm(nn.Conv1d(512, 512, kernel_size=3, stride=1, padding=1)),
+                nn.utils.weight_norm(nn.Conv1d(512, 512, kernel_size=7, padding=3)),
                 nn.LeakyReLU(0.2, inplace=True),
             ),
             nn.Sequential(
-                nn.utils.weight_norm(nn.Conv1d(512, 1, kernel_size=3, stride=1, padding=1)),
-                nn.LeakyReLU(0.2, inplace=True),
+                nn.utils.weight_norm(nn.Conv1d(512, 1, kernel_size=7, padding=3)),
             )])
 
     def forward(self, x):
