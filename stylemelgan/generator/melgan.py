@@ -125,6 +125,10 @@ class Generator(nn.Module):
 
 
 if __name__ == '__main__':
+
+
+
+
     import time
     config = read_config('../configs/melgan_config.yaml')
     model = Generator(80)
@@ -135,6 +139,11 @@ if __name__ == '__main__':
     dur = time.time() - start
 
     print('dur ', dur)
+    model = torch.hub.load('RF5/simple-speaker-embedding', 'gru_embedder')
+    y = y.squeeze()
+    mel = model.melspec_from_array(y[0], sr=22050)
+    out = model(mel.unsqueeze(0))
+    print(out)
 
     #y = model(x)
     #print(y.shape)

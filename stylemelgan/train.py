@@ -81,6 +81,8 @@ if __name__ == '__main__':
     summary_writer = SummaryWriter(log_dir=f'checkpoints/logs_{model_name}')
 
     best_stft = 9999
+    
+    speaker_model = torch.hub.load('RF5/simple-speaker-embedding', 'gru_embedder').to(device)
 
     for epoch in range(train_cfg['epochs']):
         pbar = tqdm.tqdm(enumerate(dataloader, 1), total=len(dataloader))
@@ -116,8 +118,25 @@ if __name__ == '__main__':
 
             factor = 1. if step < pretraining_steps else 0.
 
+            speaker_mels_real = []
+            for b in range(wav_real.size(0)):
+                mel = speaker_model.melspec_from_array(wav_real[b].squeeze(), sr=22050)
+                speaker_mels_real.append(mel)
+            speaker_mels_real = torch.stack(speaker_mels_real)
+            speaker_emb_real = speaker_model(speaker_mels_real)
+
+            speaker_mels_fake = []
+            for b in range(wav_fake.size(0)):
+                mel = speaker_model.melspec_from_array(wav_fake[b].squeeze(), sr=22050)
+                speaker_mels_fake.append(mel)
+            speaker_mels_fake = torch.stack(speaker_mels_fake)
+            speaker_emb_fake = speaker_model(speaker_mels_fake)
+
+            speaker_emb_loss = F.l1_loss(speaker_emb_fake, speaker_emb_real)
+            print(speaker_emb_loss)
+
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
-            g_loss_all = g_loss + factor * (stft_norm_loss + stft_spec_loss)
+            g_loss_all = g_loss + factor * (stft_norm_loss + stft_spec_loss) + speaker_emb_loss
 
             g_optim.zero_grad()
             g_loss_all.backward()
