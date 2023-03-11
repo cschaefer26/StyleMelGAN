@@ -48,9 +48,9 @@ class ResStack(nn.Module):
 
 class Prenet(nn.Module):
 
-    def __init__(self, dims=512):
+    def __init__(self, dims=16):
         super(Prenet, self).__init__()
-        self.pitch_conv = nn.Conv1d(1, dims, kernel_size=3, padding=1)
+        self.pitch_conv = nn.Conv1d(1, 16, kernel_size=3, padding=1)
         self.pre_conv = nn.Sequential(
             nn.ReflectionPad1d(3),
             nn.utils.weight_norm(nn.Conv1d(80, dims, kernel_size=7, stride=1))
@@ -59,7 +59,8 @@ class Prenet(nn.Module):
     def forward(self, mel, pitch):
         pre = self.pre_conv(mel)
         pitch = self.pitch_conv(pitch)
-        return pre + pitch
+        out = torch.cat([pre, pitch], dim=1)
+        return out
 
 
 
@@ -79,7 +80,7 @@ class Generator(nn.Module):
 
         self.generator = nn.Sequential(
             nn.LeakyReLU(0.2),
-            nn.utils.weight_norm(nn.ConvTranspose1d(512, 256, kernel_size=16, stride=8, padding=4)),
+            nn.utils.weight_norm(nn.ConvTranspose1d(512+16, 256, kernel_size=16, stride=8, padding=4)),
 
             ResStack(256, num_layers=5),
 
