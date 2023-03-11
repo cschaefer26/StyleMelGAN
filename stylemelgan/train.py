@@ -134,7 +134,7 @@ if __name__ == '__main__':
             speaker_mels_fake = torch.stack(speaker_mels_fake).to(device)
             speaker_emb_fake = speaker_model(speaker_mels_fake)
 
-            speaker_emb_loss = -F.cosine_similarity(speaker_emb_fake, speaker_emb_real).mean() * 100.
+            speaker_emb_loss = (1.-F.cosine_similarity(speaker_emb_fake, speaker_emb_real)).mean() * 100.
             print(speaker_emb_loss)
 
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
