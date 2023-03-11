@@ -83,6 +83,8 @@ if __name__ == '__main__':
     best_stft = 9999
     
     speaker_model = torch.hub.load('RF5/simple-speaker-embedding', 'gru_embedder').to(device)
+    speaker_model.melspec_tfm.stft = speaker_model.melspec_tfm.stft.to(device)
+
 
     for epoch in range(train_cfg['epochs']):
         pbar = tqdm.tqdm(enumerate(dataloader, 1), total=len(dataloader))
@@ -120,14 +122,14 @@ if __name__ == '__main__':
 
             speaker_mels_real = []
             for b in range(wav_real.size(0)):
-                mel = speaker_model.melspec_from_array(wav_real[b].squeeze().cpu(), sr=22050)
+                mel = speaker_model.melspec_from_array(wav_real[b].squeeze(), sr=22050)
                 speaker_mels_real.append(mel)
             speaker_mels_real = torch.stack(speaker_mels_real).to(device)
             speaker_emb_real = speaker_model(speaker_mels_real)
 
             speaker_mels_fake = []
             for b in range(wav_fake.size(0)):
-                mel = speaker_model.melspec_from_array(wav_fake[b].squeeze().cpu(), sr=22050)
+                mel = speaker_model.melspec_from_array(wav_fake[b].squeeze(), sr=22050)
                 speaker_mels_fake.append(mel)
             speaker_mels_fake = torch.stack(speaker_mels_fake).to(device)
             speaker_emb_fake = speaker_model(speaker_mels_fake)
