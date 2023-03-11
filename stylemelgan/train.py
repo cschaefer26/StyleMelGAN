@@ -84,7 +84,7 @@ if __name__ == '__main__':
     
     speaker_model = torch.hub.load('RF5/simple-speaker-embedding', 'gru_embedder').to(device)
     speaker_model.melspec_tfm.stft = speaker_model.melspec_tfm.stft.to(device)
-
+    cosine_loss = torch.nn.CosineSimilarity(dim=1, eps=1e-6)
 
     for epoch in range(train_cfg['epochs']):
         pbar = tqdm.tqdm(enumerate(dataloader, 1), total=len(dataloader))
@@ -134,7 +134,7 @@ if __name__ == '__main__':
             speaker_mels_fake = torch.stack(speaker_mels_fake).to(device)
             speaker_emb_fake = speaker_model(speaker_mels_fake)
 
-            speaker_emb_loss = F.l1_loss(speaker_emb_fake, speaker_emb_real) * 100.
+            speaker_emb_loss = cosine_loss(speaker_emb_fake, speaker_emb_real).mean() * 100.
             print(speaker_emb_loss)
 
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
