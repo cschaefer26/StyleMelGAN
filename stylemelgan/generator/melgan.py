@@ -1,7 +1,7 @@
 from typing import Tuple, Dict, Any
 
 import torch
-from torch.nn import Module, ModuleList, Sequential, LeakyReLU, Tanh
+from torch.nn import Module, ModuleList, Sequential, LeakyReLU, Tanh, GRU
 
 from stylemelgan.common import WNConv1d, WNConvTranspose1d
 from stylemelgan.utils import read_config
@@ -63,18 +63,33 @@ class Prenet(nn.Module):
         return out
 
 
+class PitchPred(nn.Module):
+
+    def __init__(self):
+        super(PitchPred, self).__init__()
+        self.conv_pre = nn.Sequential(
+            nn.utils.weight_norm(nn.Conv1d(80, 256, kernel_size=3, stride=1, padding=1)),
+            nn.ReLU(),
+            nn.utils.weight_norm(nn.Conv1d(256, 256, kernel_size=3, stride=1, padding=1)),
+            nn.ReLU(),
+            nn.utils.weight_norm(nn.Conv1d(256, 256, kernel_size=3, stride=1, padding=1)),
+        )
+        self.rnn = GRU(256, 256, batch_first=True, bidirectional=True)
+        self.conv_post = nn.utils.weight_norm(nn.Conv1d(512, 1, kernel_size=1, stride=1))
+
+    def forward(self, x):
+        x = self.conv_pre(x)
+        x, _ = self.rnn(x.transpose(1, 2))
+        x = self.conv_post(x.transpose(1, 2))
+        return x
+
 
 class Generator(nn.Module):
     def __init__(self, mel_channel):
         super(Generator, self).__init__()
         self.mel_channel = mel_channel
 
-        self.pitch_pred = nn.Sequential(
-            nn.ReflectionPad1d(3),
-            nn.utils.weight_norm(nn.Conv1d(mel_channel, 256, kernel_size=7, stride=1)),
-            nn.ReLU(),
-            nn.utils.weight_norm(nn.Conv1d(256, 1, kernel_size=1, stride=1)),
-        )
+        self.pitch_pred = PitchPred()
 
         self.prenet = Prenet(512)
 
