@@ -196,6 +196,7 @@ if __name__ == '__main__':
                 pitch_fake_plot = plot_pitch(pitch_fake.squeeze().cpu().numpy())
                 mel_fake_plot = plot_mel(mel_fake)
                 mel_real_plot = plot_mel(mel_real)
+                summary_writer.add_figure('pitch_fake', pitch_fake_plot, global_step=step)
                 summary_writer.add_figure('mel_generated', mel_fake_plot, global_step=step)
                 summary_writer.add_figure('mel_target', mel_real_plot, global_step=step)
 
