@@ -128,7 +128,8 @@ class Generator(nn.Module):
 
     def inference(self,
                   mel: torch.Tensor,
-                  pad_steps: int = 10) -> torch.Tensor:
+                  pad_steps: int = 10,
+                  return_pitch=False):
         with torch.no_grad():
             pad = torch.full((1, 80, pad_steps), -11.5129).to(mel.device)
             mel = torch.cat((mel, pad), dim=2)
@@ -136,7 +137,10 @@ class Generator(nn.Module):
             audio, _ = self.forward(mel, pitch)
             audio = audio.squeeze()
             audio = audio[:-(256 * pad_steps)]
-        return audio
+        if return_pitch:
+            return audio, pitch
+        else:
+            return audio
 
     @classmethod
     def from_config(cls, config: Dict[str, Any]) -> 'Generator':
