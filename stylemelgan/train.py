@@ -211,8 +211,8 @@ if __name__ == '__main__':
                 summary_writer.add_figure('pitch_target', pitch_target_plot, global_step=step)
 
                 with torch.no_grad():
-                    pitch_fake = p_model(torch.from_numpy(wav_fake).unsqueeze(0).unsqueeze(0).to(device))
-                    pitch_real = p_model(torch.from_numpy(wav_real).unsqueeze(0).unsqueeze(0).to(device))
+                    _, pitch_fake = p_model(torch.from_numpy(wav_fake).unsqueeze(0).unsqueeze(0).to(device))
+                    _, pitch_real = p_model(torch.from_numpy(wav_real).unsqueeze(0).unsqueeze(0).to(device))
 
                 pitch_fake_plot = plot_pitch(pitch_fake.squeeze().cpu().numpy())
                 pitch_real_plot = plot_pitch(pitch_real.squeeze().cpu().numpy())
