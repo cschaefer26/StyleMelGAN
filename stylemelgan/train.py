@@ -107,7 +107,7 @@ if __name__ == '__main__':
             stft_spec_loss = 0.0
             pitch_loss_fake = 0.0
 
-            p_real = p_model(wav_real)
+            p_feat_real, p_real = p_model(wav_real)
             pitch_loss_real = 10. * F.l1_loss(p_real, pitch_orig)
             p_optim.zero_grad()
             pitch_loss_real.backward()
@@ -131,13 +131,15 @@ if __name__ == '__main__':
                     for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
                         g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
-            p_fake = p_model(wav_fake)
-            pitch_loss_fake = F.l1_loss(p_fake, pitch_orig)
+            p_feat_loss = 0
+            p_feat_fake, p_score_fake = p_model(wav_fake)
+            for feat_fake_i, feat_real_i in zip(p_feat_fake, p_feat_real):
+                p_feat_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
-            factor = 1. if step < pretraining_steps else 0.
+            factor = 0. if step < pretraining_steps else 0.
 
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
-            g_loss_all = g_loss + factor * (stft_norm_loss + stft_spec_loss) + 10. * pitch_loss_fake
+            g_loss_all = g_loss + factor * (stft_norm_loss + stft_spec_loss) + p_feat_loss
 
             g_optim.zero_grad()
             g_loss_all.backward()
@@ -153,6 +155,7 @@ if __name__ == '__main__':
             summary_writer.add_scalar('generator_loss', g_loss, global_step=step)
             summary_writer.add_scalar('pitch_loss_real', pitch_loss_real, global_step=step)
             summary_writer.add_scalar('pitch_loss_fake', pitch_loss_fake, global_step=step)
+            summary_writer.add_scalar('pitch_feat_loss', p_feat_loss, global_step=step)
             summary_writer.add_scalar('stft_norm_loss', stft_norm_loss, global_step=step)
             summary_writer.add_scalar('stft_spec_loss', stft_spec_loss, global_step=step)
             summary_writer.add_scalar('discriminator_loss', d_loss, global_step=step)

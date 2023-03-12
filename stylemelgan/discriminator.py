@@ -40,7 +40,7 @@ class PitchPredictor(nn.Module):
     def __init__(self, relu_slope: float = 0.2):
         super(PitchPredictor, self).__init__()
 
-        self.convs = nn.Sequential(
+        self.convs = nn.ModuleList([
             Sequential(
                 WNConv1d(1, 16, kernel_size=15, stride=1, padding=7, padding_mode='reflect'),
                 LeakyReLU(relu_slope, inplace=True)
@@ -64,17 +64,21 @@ class PitchPredictor(nn.Module):
             Sequential(
                 WNConv1d(1024, 1024, kernel_size=5, stride=1, padding=2),
                 LeakyReLU(relu_slope, inplace=True)
-            ),
+            )],
         )
         self.rnn = GRU(1024, 256, bidirectional=True, batch_first=True)
         self.out_conv = WNConv1d(512, 1, 1)
 
     def forward(self, x):
-        x = self.convs(x)
+        features = []
+        for module in self.convs:
+            x = module(x)
+            features.append(x)
+
         x, _ = self.rnn(x.transpose(1, 2))
         x = x.transpose(1, 2)
         x = self.out_conv(x)
-        return x
+        return features, x
 
 
 class Discriminator(nn.Module):
