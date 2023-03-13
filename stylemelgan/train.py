@@ -101,7 +101,6 @@ if __name__ == '__main__':
             stft_norm_loss = 0.0
             stft_spec_loss = 0.0
 
-            """
             if step > pretraining_steps:
                 # discriminator
                 d_fake = d_model(wav_fake.detach())
@@ -119,9 +118,6 @@ if __name__ == '__main__':
                     g_loss += torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
                     for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
                         g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
-            """
-
-
 
             p_model.zero_grad()
             p_real = p_model(wav_real)
@@ -138,10 +134,11 @@ if __name__ == '__main__':
                 for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
                     gp_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
-            factor = 1. if step < pretraining_steps else 0.
+            factor = 0. if step < pretraining_steps else 0.
 
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
-            g_loss_all = gp_loss #g_loss + factor * (stft_norm_loss + stft_spec_loss) + gp_loss
+
+            g_loss_all = g_loss + factor * (stft_norm_loss + stft_spec_loss) + gp_loss
 
             g_optim.zero_grad()
             g_loss_all.backward()
