@@ -102,6 +102,7 @@ if __name__ == '__main__':
             g_loss = 0.0
             stft_norm_loss = 0.0
             stft_spec_loss = 0.0
+            rnn_g_loss = 0
 
             if step > pretraining_steps:
                 # discriminator
@@ -139,7 +140,6 @@ if __name__ == '__main__':
                     for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
                         g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
-                rnn_g_loss = 0
                 # generator
                 feats_fake = []
                 for d_r in d_fake:
