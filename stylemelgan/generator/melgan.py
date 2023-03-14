@@ -1,5 +1,5 @@
 from typing import Tuple, Dict, Any
-
+import math
 import torch
 from torch.nn import Module, ModuleList, Sequential, LeakyReLU, Tanh
 
@@ -12,6 +12,86 @@ import numpy as np
 
 MAX_WAV_VALUE = 32768.0
 
+
+import torch
+from torch import nn
+
+
+class PositionalEncoding(torch.nn.Module):
+
+    def __init__(self, d_model: int, dropout=0.1, max_len=200000) -> None:
+        super(PositionalEncoding, self).__init__()
+        self.dropout = torch.nn.Dropout(p=dropout)
+        self.scale = torch.nn.Parameter(torch.ones(1))
+
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(
+            0, d_model, 2).float() * (-math.log(10000.0) / d_model))
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        pe = pe.unsqueeze(0).transpose(0, 1)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x: torch.Tensor, shift=0) -> torch.Tensor:         # shape: [T, N]
+        x = x + self.scale * self.pe[shift:shift+x.size(0), :]
+        return self.dropout(x)
+
+
+class FeedForward(nn.Module):
+    def __init__(self, dim, hidden_dim, dropout = 0.):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(dim, hidden_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim, dim),
+            nn.Dropout(dropout)
+        )
+    def forward(self, x):
+        return self.net(x)
+
+
+class PreNorm(nn.Module):
+    def __init__(self, dim, fn):
+        super().__init__()
+        self.norm = nn.LayerNorm(dim)
+        self.fn = fn
+    def forward(self, x, **kwargs):
+        return self.fn(self.norm(x), **kwargs)
+
+
+class FNetBlock(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x):
+        x = torch.fft.fft(torch.fft.fft(x, dim=-1), dim=-2).real
+        return x
+
+
+class FNet(nn.Module):
+    def __init__(self, dim, depth, mlp_dim, dropout = 0.):
+        super().__init__()
+        self.layers = nn.ModuleList([])
+        self.pe = PositionalEncoding(dim)
+        for _ in range(depth):
+            self.layers.append(nn.ModuleList([
+                PreNorm(dim, FNetBlock()),
+                PreNorm(dim, FeedForward(dim, mlp_dim, dropout = dropout))
+            ]))
+    def forward(self, x):
+        if self.training:
+            shift = torch.randint(low=0, high=100000, size=(1, ))
+        else:
+            shift = 0
+        x = x.transpose(1, 2)
+        x = self.pe(x, shift=int(shift))
+        for attn, ff in self.layers:
+            x = attn(x) + x
+            x = ff(x) + x
+        x = x.transpose(1, 2)
+        return x
 
 
 class ResStack(nn.Module):
@@ -53,31 +133,31 @@ class Generator(nn.Module):
 
         self.generator = nn.Sequential(
             nn.ReflectionPad1d(3),
-            nn.utils.weight_norm(nn.Conv1d(mel_channel, 512, kernel_size=7, stride=1)),
-
-            nn.LeakyReLU(0.2),
-            nn.utils.weight_norm(nn.ConvTranspose1d(512, 256, kernel_size=16, stride=8, padding=4)),
-
-            ResStack(256, num_layers=5),
+            nn.utils.weight_norm(nn.Conv1d(mel_channel, 256, kernel_size=7, stride=1)),
 
             nn.LeakyReLU(0.2),
             nn.utils.weight_norm(nn.ConvTranspose1d(256, 128, kernel_size=16, stride=8, padding=4)),
 
-            ResStack(128, num_layers=7),
+            FNet(128, 6, mlp_dim=128),
 
             nn.LeakyReLU(0.2),
-            nn.utils.weight_norm(nn.ConvTranspose1d(128, 64, kernel_size=4, stride=2, padding=1)),
+            nn.utils.weight_norm(nn.ConvTranspose1d(128, 64, kernel_size=16, stride=8, padding=4)),
 
-            ResStack(64, num_layers=8),
+            FNet(64, 6, mlp_dim=64),
 
             nn.LeakyReLU(0.2),
             nn.utils.weight_norm(nn.ConvTranspose1d(64, 32, kernel_size=4, stride=2, padding=1)),
 
-            ResStack(32, num_layers=9),
+            FNet(32, 6, mlp_dim=32),
+
+            nn.LeakyReLU(0.2),
+            nn.utils.weight_norm(nn.ConvTranspose1d(32, 16, kernel_size=4, stride=2, padding=1)),
+
+            FNet(16, 6, mlp_dim=16),
 
             nn.LeakyReLU(0.2),
             nn.ReflectionPad1d(3),
-            nn.utils.weight_norm(nn.Conv1d(32, 1, kernel_size=7, stride=1)),
+            nn.utils.weight_norm(nn.Conv1d(16, 1, kernel_size=7, stride=1)),
             nn.Tanh(),
         )
 
