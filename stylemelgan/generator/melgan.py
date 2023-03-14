@@ -22,19 +22,20 @@ class PositionalEncoding(torch.nn.Module):
     def __init__(self, d_model: int, dropout=0.1, max_len=200000) -> None:
         super(PositionalEncoding, self).__init__()
         self.dropout = torch.nn.Dropout(p=dropout)
-        self.scale = torch.nn.Parameter(torch.ones(1), requires_grad=True)
+        self.scale = torch.nn.Parameter(torch.ones(1))
 
         pe = torch.zeros(max_len, d_model)
         position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
-        pe[:, 0::2] = torch.sin(position * 0.001)
-        pe[:, 1::2] = torch.cos(position * 0.001)
+        div_term = torch.exp(torch.arange(
+            0, d_model, 2).float() * (-math.log(10000.0) / d_model))
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
         pe = pe.unsqueeze(0).transpose(0, 1)
         self.register_buffer('pe', pe)
 
-    def forward(self, x: torch.Tensor, shift=0) -> torch.Tensor:
-        x = x.transpose(1, 2)# shape: [T, N]
-        x = x + self.scale * self.pe[:x.size(0), :]
-        return self.dropout(x).transpose(1, 2)
+    def forward(self, x: torch.Tensor, shift=0) -> torch.Tensor:         # shape: [T, N]
+        x = x + self.scale * self.pe[shift:shift+x.size(0), :]
+        return self.dropout(x)
 
 
 class FeedForward(nn.Module):
@@ -81,7 +82,6 @@ class FNet(nn.Module):
             ]))
 
     def forward(self, x):
-        x = self.pe(x)
         x = x.transpose(1, 2)
         for attn, ff in self.layers:
             x = attn(x) + x
