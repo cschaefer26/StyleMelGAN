@@ -62,13 +62,13 @@ if __name__ == '__main__':
 
     try:
         checkpoint = torch.load(f'checkpoints/latest_model__{model_name}.pt', map_location=device)
+        step = checkpoint['step']
         g_model.load_state_dict(checkpoint['model_g'])
         g_optim.load_state_dict(checkpoint['optim_g'])
         d_model.load_state_dict(checkpoint['model_d'])
         d_optim.load_state_dict(checkpoint['optim_d'])
         r_model.loar_state_dict(checkpoint['model_d'])
         r_optim.loar_state_dict(checkpoint['optim_d'])
-        step = checkpoint['step']
         print(f'Loaded model with step {step}')
     except Exception as e:
         'Initializing model from scratch.'
@@ -127,8 +127,8 @@ if __name__ == '__main__':
                 r_fake = r_model(feats_fake)
                 r_real = r_model(feats_real)
                 for score_fake, score_real in zip(r_fake, r_real):
-                    r_loss += torch.mean(torch.sum(torch.pow(score_real - 1.0, 2), dim=[1, 2]))
-                    r_loss += torch.mean(torch.sum(torch.pow(score_fake, 2), dim=[1, 2]))
+                    r_loss += torch.mean(torch.pow(score_real - 1.0, 2), dim=[1, 2])
+                    r_loss += torch.mean(torch.pow(score_fake, 2), dim=[1, 2])
                 r_optim.zero_grad()
                 r_loss.backward()
                 r_optim.step()
@@ -146,7 +146,7 @@ if __name__ == '__main__':
                     feats_fake.append(d_r[0])
                 r_fake = r_model(feats_fake)
                 for score_fake in r_fake:
-                    conv_g_loss += torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
+                    conv_g_loss += torch.mean(torch.pow(score_fake - 1.0, 2), dim=[1, 2])
 
             factor = 1. if step < pretraining_steps else 0.
 
