@@ -11,7 +11,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from stylemelgan.audio import Audio
 from stylemelgan.dataset import new_dataloader, AudioDataset
-from stylemelgan.discriminator import MultiScaleDiscriminator, MultiScaleRNNDiscriminator
+from stylemelgan.discriminator import MultiScaleDiscriminator, MultiScaleFeatDiscriminator
 from stylemelgan.generator.melgan import Generator
 from stylemelgan.losses import stft, MultiResStftLoss
 from stylemelgan.utils import read_config
@@ -47,7 +47,7 @@ if __name__ == '__main__':
 
     g_model = Generator(audio.n_mels).to(device)
     d_model = MultiScaleDiscriminator().to(device)
-    r_model = MultiScaleRNNDiscriminator().to(device)
+    r_model = MultiScaleFeatDiscriminator().to(device)
     train_cfg = config['training']
     g_optim = torch.optim.Adam(g_model.parameters(), lr=train_cfg['g_lr'], betas=(0.5, 0.9))
     d_optim = torch.optim.Adam(d_model.parameters(), lr=train_cfg['d_lr'], betas=(0.5, 0.9))
@@ -102,7 +102,7 @@ if __name__ == '__main__':
             g_loss = 0.0
             stft_norm_loss = 0.0
             stft_spec_loss = 0.0
-            rnn_g_loss = 0
+            conv_g_loss = 0
 
             if step > pretraining_steps:
                 # discriminator
@@ -118,15 +118,15 @@ if __name__ == '__main__':
                 # discriminator
                 feats_real = []
                 for d_r in d_real:
-                    feats_real.append(d_r[0][-1].detach())
+                    feats_real.append([x.detach() for x in d_r[0]])
 
                 feats_fake = []
                 for d_r in d_fake:
-                    feats_fake.append(d_r[0][-1].detach())
+                    feats_fake.append([x.detach() for x in d_r[0]])
 
                 r_fake = r_model(feats_fake)
                 r_real = r_model(feats_real)
-                for (_, score_fake), (_, score_real) in zip(r_fake, r_real):
+                for score_fake, score_real in zip(r_fake, r_real):
                     r_loss += torch.mean(torch.sum(torch.pow(score_real - 1.0, 2), dim=[1, 2]))
                     r_loss += torch.mean(torch.sum(torch.pow(score_fake, 2), dim=[1, 2]))
                 r_optim.zero_grad()
@@ -143,15 +143,15 @@ if __name__ == '__main__':
                 # generator
                 feats_fake = []
                 for d_r in d_fake:
-                    feats_fake.append(d_r[0][-1])
+                    feats_fake.append(d_r[0])
                 r_fake = r_model(feats_fake)
-                for (feat_fake, score_fake), (feat_real, _) in zip(r_fake, r_real):
-                    rnn_g_loss += torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
+                for score_fake in r_fake:
+                    conv_g_loss += torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
 
             factor = 1. if step < pretraining_steps else 0.
 
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
-            g_loss_all = g_loss + rnn_g_loss + factor * (stft_norm_loss + stft_spec_loss)
+            g_loss_all = g_loss + conv_g_loss + factor * (stft_norm_loss + stft_spec_loss)
 
             g_optim.zero_grad()
             g_loss_all.backward()
@@ -164,11 +164,11 @@ if __name__ == '__main__':
                                       f'| stft_spec_loss {stft_spec_loss:#.4} ', refresh=True)
 
             summary_writer.add_scalar('generator_loss', g_loss, global_step=step)
-            summary_writer.add_scalar('generator_rnn_loss', rnn_g_loss, global_step=step)
+            summary_writer.add_scalar('generator_conv_loss', conv_g_loss, global_step=step)
             summary_writer.add_scalar('stft_norm_loss', stft_norm_loss, global_step=step)
             summary_writer.add_scalar('stft_spec_loss', stft_spec_loss, global_step=step)
             summary_writer.add_scalar('discriminator_loss', d_loss, global_step=step)
-            summary_writer.add_scalar('discriminator_rnn_loss', r_loss, global_step=step)
+            summary_writer.add_scalar('discriminator_conv_loss', r_loss, global_step=step)
 
             if step % train_cfg['eval_steps'] == 0:
                 g_model.eval()

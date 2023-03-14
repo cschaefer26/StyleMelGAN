@@ -59,19 +59,24 @@ class Discriminator(nn.Module):
         return features[:-1], features[-1]
 
 
-class RNNDiscriminator(nn.Module):
+class FeatDiscriminator(nn.Module):
 
-    def __init__(self, dim_in=1024, dim=256):
-        super(RNNDiscriminator, self).__init__()
-        self.conv_in = nn.utils.weight_norm(nn.Conv1d(dim_in, dim, kernel_size=1, stride=1))
-        self.rnn = nn.GRU(dim, dim, bidirectional=True)
-        self.conv_out = nn.utils.weight_norm(nn.Conv1d(2 * dim, 1, kernel_size=1, stride=1))
+    def __init__(self, feat_dims=[16, 64, 256, 1024, 1024, 1024]):
+        super(FeatDiscriminator, self).__init__()
+        self.discriminator = nn.ModuleList([
+            nn.Sequential(
+                nn.utils.weight_norm(nn.Conv1d(feat_dim, feat_dim, kernel_size=5, stride=1, padding=2)),
+                nn.LeakyReLU(0.2, inplace=True),
+                nn.utils.weight_norm(nn.Conv1d(feat_dim, 1, kernel_size=3, stride=1, padding=1)),
+            ) for feat_dim in feat_dims
+        ])
 
-    def forward(self, x):
-        x = self.conv_in(x)
-        x, _ = self.rnn(x.transpose(1, 2))
-        x = self.conv_out(x.transpose(1, 2))
-        return x
+    def forward(self, x_in):
+        features = list()
+        for feat, module in zip(x_in, self.discriminator):
+            x = module(feat)
+            features.append(x)
+        return features
 
 
 class MultiScaleDiscriminator(nn.Module):
@@ -98,20 +103,20 @@ class MultiScaleDiscriminator(nn.Module):
         return ret  # [(feat, score), (feat, score), (feat, score)]
 
 
-class MultiScaleRNNDiscriminator(nn.Module):
+class MultiScaleFeatDiscriminator(nn.Module):
 
     def __init__(self):
-        super(MultiScaleRNNDiscriminator, self).__init__()
+        super(MultiScaleFeatDiscriminator, self).__init__()
 
         self.discriminators = nn.ModuleList(
-            [RNNDiscriminator() for _ in range(3)]
+            [FeatDiscriminator() for _ in range(3)]
         )
 
     def forward(self, feats):
         ret = list()
 
         for feat, disc in zip(feats, self.discriminators):
-            ret.append((None, disc(feat)))
+            ret.extend(disc(feat))
 
         return ret  # [(feat, score), (feat, score), (feat, score)]
 
@@ -124,9 +129,9 @@ if __name__ == '__main__':
     model = MultiScaleDiscriminator()
     out = model(x)
 
-    feats = [o[0][-1] for o in out]
+    feats = [o[0] for o in out]
 
-    rnn_disc = MultiScaleRNNDiscriminator()
+    rnn_disc = MultiScaleFeatDiscriminator()
     feat_out = rnn_disc(feats)
 
     print(feat_out)
@@ -134,9 +139,6 @@ if __name__ == '__main__':
     exit()
     print(x.shape)
 
-    for feat in features:
-        print(feat.shape)
-    print(score.shape)
 
     pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(pytorch_total_params)
