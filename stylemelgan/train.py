@@ -139,22 +139,19 @@ if __name__ == '__main__':
                     for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
                         g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
+                rnn_g_loss = 0
                 # generator
-                d_fake = d_model(wav_fake)
                 feats_fake = []
                 for d_r in d_fake:
                     feats_fake.append(d_r[0][-1])
                 r_fake = r_model(feats_fake)
                 for (feat_fake, score_fake), (feat_real, _) in zip(r_fake, r_real):
-                    g_loss += torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
-
-
-
+                    rnn_g_loss += torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
 
             factor = 1. if step < pretraining_steps else 0.
 
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
-            g_loss_all = g_loss + factor * (stft_norm_loss + stft_spec_loss)
+            g_loss_all = g_loss + rnn_g_loss + factor * (stft_norm_loss + stft_spec_loss)
 
             g_optim.zero_grad()
             g_loss_all.backward()
@@ -167,6 +164,7 @@ if __name__ == '__main__':
                                       f'| stft_spec_loss {stft_spec_loss:#.4} ', refresh=True)
 
             summary_writer.add_scalar('generator_loss', g_loss, global_step=step)
+            summary_writer.add_scalar('generator_rnn_loss', rnn_g_loss, global_step=step)
             summary_writer.add_scalar('stft_norm_loss', stft_norm_loss, global_step=step)
             summary_writer.add_scalar('stft_spec_loss', stft_spec_loss, global_step=step)
             summary_writer.add_scalar('discriminator_loss', d_loss, global_step=step)
@@ -200,10 +198,8 @@ if __name__ == '__main__':
                     best_stft = val_norm_loss + val_spec_loss
                     print(f'\nnew best stft: {best_stft}')
                     torch.save({
-                        'g_model_g': g_model.state_dict(),
-                        'g_optim_g': g_optim.state_dict(),
-                        'model_d': d_model.state_dict(),
-                        'optim_d': d_optim.state_dict(),
+                        'model_g': g_model.state_dict(),
+                        'optim_g': g_optim.state_dict(),
                         'config': config,
                         'step': step
                     }, f'checkpoints/best_model_{model_name}.pt')
@@ -223,6 +219,8 @@ if __name__ == '__main__':
         torch.save({
             'model_g': g_model.state_dict(),
             'optim_g': g_optim.state_dict(),
+            'model_r': r_model.state_dict(),
+            'optim_r': r_optim.state_dict(),
             'model_d': d_model.state_dict(),
             'optim_d': d_optim.state_dict(),
             'config': config,
