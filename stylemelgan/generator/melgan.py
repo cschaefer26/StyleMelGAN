@@ -74,19 +74,13 @@ class FNet(nn.Module):
     def __init__(self, dim, depth, mlp_dim, dropout = 0.):
         super().__init__()
         self.layers = nn.ModuleList([])
-        self.pe = PositionalEncoding(dim)
         for _ in range(depth):
             self.layers.append(nn.ModuleList([
                 PreNorm(dim, FNetBlock()),
                 PreNorm(dim, FeedForward(dim, mlp_dim, dropout = dropout))
             ]))
     def forward(self, x):
-        if self.training:
-            shift = torch.randint(low=0, high=100000, size=(1, ))
-        else:
-            shift = 0
         x = x.transpose(1, 2)
-        x = self.pe(x, shift=int(shift))
         for attn, ff in self.layers:
             x = attn(x) + x
             x = ff(x) + x
