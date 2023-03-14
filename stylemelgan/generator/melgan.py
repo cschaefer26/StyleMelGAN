@@ -22,9 +22,7 @@ class PositionalEncoding(torch.nn.Module):
     def __init__(self, d_model: int, dropout=0.1, max_len=200000) -> None:
         super(PositionalEncoding, self).__init__()
         self.dropout = torch.nn.Dropout(p=dropout)
-        self.scale_1 = torch.nn.Parameter(torch.ones(1), requires_grad=True)
-        self.scale_2 = torch.nn.Parameter(torch.ones(1), requires_grad=True)
-        self.scale_3 = torch.nn.Parameter(torch.ones(1), requires_grad=True)
+        self.scale = torch.nn.Parameter(torch.ones(1), requires_grad=True)
 
         pe = torch.zeros(max_len, d_model)
         position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
@@ -35,7 +33,7 @@ class PositionalEncoding(torch.nn.Module):
 
     def forward(self, x: torch.Tensor, shift=0) -> torch.Tensor:
         x = x.transpose(1, 2)# shape: [T, N]
-        x = x + self.scale_3 * self.pe[:x.size(0), :]
+        x = x + self.scale * self.pe[:x.size(0), :]
         return self.dropout(x).transpose(1, 2)
 
 
