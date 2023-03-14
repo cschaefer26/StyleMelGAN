@@ -11,7 +11,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from stylemelgan.audio import Audio
 from stylemelgan.dataset import new_dataloader, AudioDataset
-from stylemelgan.discriminator import MultiScaleDiscriminator
+from stylemelgan.discriminator import MultiScaleDiscriminator, MultiScaleRNNDiscriminator
 from stylemelgan.generator.melgan import Generator
 from stylemelgan.losses import stft, MultiResStftLoss
 from stylemelgan.utils import read_config
@@ -47,12 +47,16 @@ if __name__ == '__main__':
 
     g_model = Generator(audio.n_mels).to(device)
     d_model = MultiScaleDiscriminator().to(device)
+    r_model = MultiScaleRNNDiscriminator().to(device)
     train_cfg = config['training']
     g_optim = torch.optim.Adam(g_model.parameters(), lr=train_cfg['g_lr'], betas=(0.5, 0.9))
     d_optim = torch.optim.Adam(d_model.parameters(), lr=train_cfg['d_lr'], betas=(0.5, 0.9))
+    r_optim = torch.optim.Adam(r_model.parameters(), lr=train_cfg['d_lr'], betas=(0.5, 0.9))
     for g in g_optim.param_groups:
         g['lr'] = train_cfg['g_lr']
     for g in d_optim.param_groups:
+        g['lr'] = train_cfg['d_lr']
+    for g in r_optim.param_groups:
         g['lr'] = train_cfg['d_lr']
     multires_stft_loss = MultiResStftLoss().to(device)
 
@@ -62,6 +66,8 @@ if __name__ == '__main__':
         g_optim.load_state_dict(checkpoint['optim_g'])
         d_model.load_state_dict(checkpoint['model_d'])
         d_optim.load_state_dict(checkpoint['optim_d'])
+        r_model.loar_state_dict(checkpoint['model_d'])
+        r_optim.loar_state_dict(checkpoint['optim_d'])
         step = checkpoint['step']
         print(f'Loaded model with step {step}')
     except Exception as e:
@@ -92,6 +98,7 @@ if __name__ == '__main__':
             wav_fake = g_model(mel)[:, :, :train_cfg['segment_len']]
 
             d_loss = 0.0
+            r_loss = 0.0
             g_loss = 0.0
             stft_norm_loss = 0.0
             stft_spec_loss = 0.0
@@ -107,12 +114,42 @@ if __name__ == '__main__':
                 d_loss.backward()
                 d_optim.step()
 
+                # discriminator
+                feats_real = []
+                for d_r in d_real:
+                    feats_real.append(d_r[0][-1].detach())
+
+                feats_fake = []
+                for d_r in d_fake:
+                    feats_fake.append(d_r[0][-1].detach())
+
+                r_fake = r_model(feats_fake)
+                r_real = r_model(feats_real)
+                for (_, score_fake), (_, score_real) in zip(r_fake, r_real):
+                    r_loss += torch.mean(torch.sum(torch.pow(score_real - 1.0, 2), dim=[1, 2]))
+                    r_loss += torch.mean(torch.sum(torch.pow(score_fake, 2), dim=[1, 2]))
+                r_optim.zero_grad()
+                r_loss.backward()
+                r_optim.step()
+
                 # generator
                 d_fake = d_model(wav_fake)
                 for (feat_fake, score_fake), (feat_real, _) in zip(d_fake, d_real):
                     g_loss += torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
                     for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
                         g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
+
+                # generator
+                d_fake = d_model(wav_fake)
+                feats_fake = []
+                for d_r in d_fake:
+                    feats_fake.append(d_r[0][-1])
+                r_fake = r_model(feats_fake)
+                for (feat_fake, score_fake), (feat_real, _) in zip(r_fake, r_real):
+                    g_loss += torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
+
+
+
 
             factor = 1. if step < pretraining_steps else 0.
 
