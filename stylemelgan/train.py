@@ -127,8 +127,8 @@ if __name__ == '__main__':
                 r_fake = r_model(feats_fake)
                 r_real = r_model(feats_real)
                 for score_fake, score_real in zip(r_fake, r_real):
-                    r_loss += torch.mean(torch.pow(score_real - 1.0, 2), dim=[1, 2])
-                    r_loss += torch.mean(torch.pow(score_fake, 2), dim=[1, 2])
+                    r_loss += torch.mean(torch.pow(score_real - 1.0, 2))
+                    r_loss += torch.mean(torch.pow(score_fake, 2))
                 r_optim.zero_grad()
                 r_loss.backward()
                 r_optim.step()
@@ -146,7 +146,7 @@ if __name__ == '__main__':
                     feats_fake.append(d_r[0])
                 r_fake = r_model(feats_fake)
                 for score_fake in r_fake:
-                    conv_g_loss += torch.mean(torch.pow(score_fake - 1.0, 2), dim=[1, 2])
+                    conv_g_loss += torch.mean(torch.pow(score_fake - 1.0, 2))
 
             factor = 1. if step < pretraining_steps else 0.
 
