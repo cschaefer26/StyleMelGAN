@@ -22,34 +22,35 @@ class PositionalEncoding(torch.nn.Module):
     def __init__(self, d_model: int, dropout=0.1, max_len=200000) -> None:
         super(PositionalEncoding, self).__init__()
         self.dropout = torch.nn.Dropout(p=dropout)
-        self.scale = torch.nn.Parameter(torch.ones(1))
+        self.scale_1 = torch.nn.Parameter(torch.ones(1), requires_grad=True)
+        self.scale_2 = torch.nn.Parameter(torch.ones(1), requires_grad=True)
+        self.scale_3 = torch.nn.Parameter(torch.ones(1), requires_grad=True)
 
         pe = torch.zeros(max_len, d_model)
         position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
-        div_term = torch.exp(torch.arange(
-            0, d_model, 2).float() * (-math.log(10000.0) / d_model))
-        pe[:, 0::2] = torch.sin(position * div_term)
-        pe[:, 1::2] = torch.cos(position * div_term)
+        pe[:, 0::2] = torch.sin(position * self.scale_1)
+        pe[:, 1::2] = torch.cos(position * self.scale_2)
         pe = pe.unsqueeze(0).transpose(0, 1)
         self.register_buffer('pe', pe)
 
-    def forward(self, x: torch.Tensor, shift=0) -> torch.Tensor:         # shape: [T, N]
-        x = x + self.scale * self.pe[shift:shift+x.size(0), :]
-        return self.dropout(x)
+    def forward(self, x: torch.Tensor, shift=0) -> torch.Tensor:
+        x = x.transpose(1, 2)# shape: [T, N]
+        x = x + self.scale_3 * self.pe[shift:shift+x.size(0), :]
+        return self.dropout(x).transpose(1, 2)
 
 
 class FeedForward(nn.Module):
     def __init__(self, dim, hidden_dim, dropout = 0.):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(dim, hidden_dim),
-            nn.GELU(),
+            nn.Conv1d(dim, hidden_dim, 3, padding=1),
+            nn.LeakyReLU(0.2),
             nn.Dropout(dropout),
-            nn.Linear(hidden_dim, dim),
+            nn.Conv1d(hidden_dim, dim, 1),
             nn.Dropout(dropout)
         )
     def forward(self, x):
-        return self.net(x)
+        return self.net(x.transpose(1, 2)).transpose(1, 2)
 
 
 class PreNorm(nn.Module):
@@ -74,12 +75,15 @@ class FNet(nn.Module):
     def __init__(self, dim, depth, mlp_dim, dropout = 0.):
         super().__init__()
         self.layers = nn.ModuleList([])
+        self.pe = PositionalEncoding(dim)
         for _ in range(depth):
             self.layers.append(nn.ModuleList([
                 PreNorm(dim, FNetBlock()),
                 PreNorm(dim, FeedForward(dim, mlp_dim, dropout = dropout))
             ]))
+
     def forward(self, x):
+        x = self.pe(x)
         x = x.transpose(1, 2)
         for attn, ff in self.layers:
             x = attn(x) + x
