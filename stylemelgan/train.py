@@ -168,6 +168,7 @@ if __name__ == '__main__':
             summary_writer.add_scalar('stft_norm_loss', stft_norm_loss, global_step=step)
             summary_writer.add_scalar('stft_spec_loss', stft_spec_loss, global_step=step)
             summary_writer.add_scalar('discriminator_loss', d_loss, global_step=step)
+            summary_writer.add_scalar('discriminator_rnn_loss', r_loss, global_step=step)
 
             if step % train_cfg['eval_steps'] == 0:
                 g_model.eval()
