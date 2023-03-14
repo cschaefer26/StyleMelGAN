@@ -35,7 +35,7 @@ class PositionalEncoding(torch.nn.Module):
 
     def forward(self, x: torch.Tensor, shift=0) -> torch.Tensor:
         x = x.transpose(1, 2)# shape: [T, N]
-        x = x + self.scale_3 * self.pe[shift:shift+x.size(0), :]
+        x = x + self.scale_3 * self.pe[:x.size(0), :]
         return self.dropout(x).transpose(1, 2)
 
 
