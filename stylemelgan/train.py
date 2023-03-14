@@ -191,10 +191,6 @@ if __name__ == '__main__':
                     torch.save({
                         'g_model': g_model.state_dict(),
                         'g_optim': g_optim.state_dict(),
-                        'd_model': d_model.state_dict(),
-                        'd_optim': d_optim.state_dict(),
-                        'p_model': p_model.state_dict(),
-                        'p_optim': p_optim.state_dict(),
                         'config': config,
                         'step': step
                     }, f'checkpoints/best_model_{model_name}.pt')

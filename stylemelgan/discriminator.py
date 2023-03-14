@@ -148,7 +148,7 @@ class DiscriminatorP(torch.nn.Module):
             norm_f(Conv2d(512, 1024, (kernel_size, 1), (stride, 1), padding=(get_padding(5, 1), 0))),
             norm_f(Conv2d(1024, 1024, (kernel_size, 1), 1, padding=(2, 0))),
         ])
-        self.conv_post = norm_f(Conv2d(512, 1, (3, 1), 1, padding=(1, 0)))
+        self.conv_post = norm_f(Conv2d(1024, 1, (3, 1), 1, padding=(1, 0)))
 
     def forward(self, x):
         fmap = []
