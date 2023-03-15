@@ -73,7 +73,7 @@ class Generator(nn.Module):
             nn.LeakyReLU(0.2),
             nn.utils.weight_norm(nn.ConvTranspose1d(64, 32, kernel_size=4, stride=2, padding=1)),
 
-            ResStack(32, num_layers=9),
+            ResStack(32, num_layers=8),
 
             nn.LeakyReLU(0.2),
             nn.ReflectionPad1d(3),
