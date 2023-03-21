@@ -67,8 +67,8 @@ if __name__ == '__main__':
         g_optim.load_state_dict(checkpoint['optim_g'])
         d_model.load_state_dict(checkpoint['model_d'])
         d_optim.load_state_dict(checkpoint['optim_d'])
-        r_model.loar_state_dict(checkpoint['model_d'])
-        r_optim.loar_state_dict(checkpoint['optim_d'])
+        r_model.load_state_dict(checkpoint['model_r'])
+        r_optim.load_state_dict(checkpoint['optim_r'])
         print(f'Loaded model with step {step}')
     except Exception as e:
         'Initializing model from scratch.'
