@@ -101,6 +101,7 @@ if __name__ == '__main__':
             d_loss = 0.0
             p_loss = 0.0
             g_loss = 0.0
+            gp_loss = 0.0
             stft_norm_loss = 0.0
             stft_spec_loss = 0.0
 
@@ -135,14 +136,14 @@ if __name__ == '__main__':
                 # generator p
                 p_fake = p_model(wav_fake)
                 for (feat_fake, score_fake), (feat_real, _) in zip(p_fake, p_real):
-                    g_loss += torch.mean(torch.pow(score_fake - 1.0, 2))
+                    gp_loss += torch.mean(torch.pow(score_fake - 1.0, 2))
                     for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
-                        g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
+                        gp_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
             factor = 1. if step < pretraining_steps else 0.
 
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
-            g_loss_all = g_loss + factor * (stft_norm_loss + stft_spec_loss)
+            g_loss_all = g_loss + gp_loss + factor * (stft_norm_loss + stft_spec_loss)
 
             g_optim.zero_grad()
             g_loss_all.backward()
@@ -150,11 +151,13 @@ if __name__ == '__main__':
 
             pbar.set_description(desc=f'Epoch: {epoch} | Step {step} '
                                       f'| g_loss: {g_loss:#.4} '
+                                      f'| gp_loss: {gp_loss:#.4} '
                                       f'| d_loss: {d_loss:#.4} '
                                       f'| stft_norm_loss {stft_norm_loss:#.4} '
                                       f'| stft_spec_loss {stft_spec_loss:#.4} ', refresh=True)
 
             summary_writer.add_scalar('generator_loss', g_loss, global_step=step)
+            summary_writer.add_scalar('generator_p_loss', gp_loss, global_step=step)
             summary_writer.add_scalar('stft_norm_loss', stft_norm_loss, global_step=step)
             summary_writer.add_scalar('stft_spec_loss', stft_spec_loss, global_step=step)
             summary_writer.add_scalar('d_loss', d_loss, global_step=step)
