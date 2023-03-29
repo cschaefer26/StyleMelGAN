@@ -163,6 +163,16 @@ class Generator(torch.nn.Module):
 
         return x
 
+    def inference(self,
+                  mel: torch.Tensor,
+                  pad_steps: int = 10) -> torch.Tensor:
+        with torch.no_grad():
+            pad = torch.full((1, 80, pad_steps), -11.5129).to(mel.device)
+            mel = torch.cat((mel, pad), dim=2)
+            audio = self.forward(mel).squeeze()
+            audio = audio[:-(256 * pad_steps)]
+        return audio
+
     def remove_weight_norm(self):
         print('Removing weight norm...')
         for l in self.ups:
