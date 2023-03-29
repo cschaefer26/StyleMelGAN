@@ -12,7 +12,7 @@ from torch.utils.tensorboard import SummaryWriter
 from stylemelgan.audio import Audio
 from stylemelgan.dataset import new_dataloader, AudioDataset
 from stylemelgan.discriminator import MultiScaleDiscriminator,  MultiPeriodDiscriminator
-from stylemelgan.generator.melgan import Generator
+from stylemelgan.generator.melgan import Generator, AttrDict
 from stylemelgan.losses import stft, MultiResStftLoss
 from stylemelgan.utils import read_config
 
@@ -45,7 +45,13 @@ if __name__ == '__main__':
 
     step = 0
 
-    g_model = Generator(audio.n_mels).to(device)
+    import json
+    with open('config_v2.json') as f:
+        data = f.read()
+    json_config = json.loads(data)
+    h = AttrDict(json_config)
+
+    g_model = Generator(h).to(device)
     d_model = MultiScaleDiscriminator().to(device)
     p_model = MultiPeriodDiscriminator().to(device)
     train_cfg = config['training']

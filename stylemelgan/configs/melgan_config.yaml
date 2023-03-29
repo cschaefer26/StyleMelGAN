@@ -23,7 +23,7 @@ training:
   d_lr: 0.0001
   eval_steps: 10
   epochs: 100000
-  num_workers: 6
+  num_workers: 2
 
 model:
   channels: [512, 256, 128, 64, 32]
