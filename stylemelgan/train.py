@@ -137,9 +137,9 @@ if __name__ == '__main__':
                 # generator p
                 p_fake = p_model(wav_fake)
                 for (feat_fake, score_fake), (feat_real, _) in zip(p_fake, p_real):
-                    gp_loss += torch.mean(torch.pow(score_fake - 1.0, 2))
+                    gp_loss += 0.01 * torch.mean(torch.pow(score_fake - 1.0, 2))
                     for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
-                        gp_feat_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
+                        gp_feat_loss += 0.1 * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
             factor = 10. if step < pretraining_steps else 10.
 
