@@ -234,12 +234,7 @@ class DiscriminatorP(nn.Module):
                 WNConv1d(16, 512, kernel_size=41, stride=4, padding=20, groups=4),
                 LeakyReLU(relu_slope, inplace=True),
             ),
-            FNet(512, 1, 512),
-            FNet(512, 1, 512),
-            FNet(512, 1, 512),
-            FNet(512, 1, 512),
-            FNet(512, 1, 512),
-            FNet(512, 1, 512),
+            FNet(512, 4, 512),
 
             WNConv1d(512, 1, kernel_size=3, stride=1, padding=1)
         ])
