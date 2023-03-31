@@ -240,12 +240,6 @@ class DiscriminatorP(nn.Module):
             FNet(512, 1, 512),
             FNet(512, 1, 512),
             FNet(512, 1, 512),
-            FNet(512, 1, 512),
-            FNet(512, 1, 512),
-            FNet(512, 1, 512),
-            FNet(512, 1, 512),
-            FNet(512, 1, 512),
-            FNet(512, 1, 512),
 
             WNConv1d(512, 1, kernel_size=3, stride=1, padding=1)
         ])
