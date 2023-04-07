@@ -96,7 +96,7 @@ if __name__ == '__main__':
             #wav_fake = g_model(mel)[:, :, :train_cfg['segment_len']]
             wav_fake = torch_stft.inverse(spec, phase)
 
-            print(wav_fake.size())
+            #print(wav_fake.size())
 
             d_loss = 0.0
             g_loss = 0.0
