@@ -76,7 +76,7 @@ if __name__ == '__main__':
 
     stft = partial(stft, n_fft=1024, hop_length=256, win_length=1024)
 
-    torch_stft = TorchSTFT(filter_length=128, hop_length=4, win_length=128).to(device)
+    torch_stft = TorchSTFT(filter_length=16, hop_length=4, win_length=16).to(device)
 
 
     pretraining_steps = train_cfg['pretraining_steps']
