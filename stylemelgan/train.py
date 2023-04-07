@@ -121,7 +121,7 @@ if __name__ == '__main__':
                     for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
                         g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
-            factor = 1. if step < pretraining_steps else 0.
+            factor = 10. if step < pretraining_steps else 10.
 
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
             g_loss_all = g_loss + factor * (stft_norm_loss + stft_spec_loss)
@@ -152,6 +152,7 @@ if __name__ == '__main__':
                     val_mel = val_mel.unsqueeze(0)
                     s, p = g_model.inference(val_mel).squeeze().cpu().numpy()
                     wav_fake = torch_stft.inverse(s, p)
+                    wav_fake = wav_fake.squeeze().cpu().numpy()
                     wav_real = val_data['wav'].detach().squeeze().cpu().numpy()
                     wav_f = torch.tensor(wav_fake).unsqueeze(0).to(device)
                     wav_r = torch.tensor(wav_real).unsqueeze(0).to(device)
