@@ -13,7 +13,7 @@ from stylemelgan.audio import Audio
 from stylemelgan.dataset import new_dataloader, AudioDataset
 from stylemelgan.discriminator import MultiScaleDiscriminator,  MultiPeriodDiscriminator
 from stylemelgan.generator.melgan import Generator
-from stylemelgan.losses import stft, MultiResStftLoss
+from stylemelgan.losses import stft, MultiResStftLoss, TorchSTFT
 from stylemelgan.utils import read_config
 
 mpl.use('agg')  # Use non-interactive backend by default
@@ -82,6 +82,9 @@ if __name__ == '__main__':
 
     stft = partial(stft, n_fft=1024, hop_length=256, win_length=1024)
 
+    torch_stft = TorchSTFT(filter_length=16, hop_length=4, win_length=16).to(device)
+
+
     pretraining_steps = train_cfg['pretraining_steps']
 
     summary_writer = SummaryWriter(log_dir=f'checkpoints/logs_{model_name}')
@@ -95,8 +98,11 @@ if __name__ == '__main__':
             mel = data['mel'].to(device)
             wav_real = data['wav'].to(device)
 
-            wav_fake = g_model(mel)
-            wav_fake = wav_fake[:, :, :train_cfg['segment_len']]
+            spec, phase = g_model(mel)
+            #wav_fake = g_model(mel)[:, :, :train_cfg['segment_len']]
+            wav_fake = torch_stft.inverse(spec, phase)
+
+            #print(wav_fake.size())
 
             d_loss = 0.0
             p_loss = 0.0
@@ -140,7 +146,7 @@ if __name__ == '__main__':
                     for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
                         gp_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
-            factor = 10. if step < pretraining_steps else 10.
+            factor = 100. if step < pretraining_steps else 100.
 
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
             g_loss_all = g_loss + gp_loss + factor * (stft_norm_loss + stft_spec_loss)
@@ -172,7 +178,9 @@ if __name__ == '__main__':
                 for i, val_data in enumerate(val_dataset):
                     val_mel = val_data['mel'].to(device)
                     val_mel = val_mel.unsqueeze(0)
-                    wav_fake = g_model.inference(val_mel).squeeze().cpu().numpy()
+                    s, p = g_model.inference(val_mel)
+                    wav_fake = torch_stft.inverse(s, p)
+                    wav_fake = wav_fake.squeeze().cpu().numpy()
                     wav_real = val_data['wav'].detach().squeeze().cpu().numpy()
                     wav_f = torch.tensor(wav_fake).unsqueeze(0).to(device)
                     wav_r = torch.tensor(wav_real).unsqueeze(0).to(device)
@@ -192,8 +200,8 @@ if __name__ == '__main__':
                     best_stft = val_norm_loss + val_spec_loss
                     print(f'\nnew best stft: {best_stft}')
                     torch.save({
-                        'g_model': g_model.state_dict(),
-                        'g_optim': g_optim.state_dict(),
+                        'model_g': g_model.state_dict(),
+                        'optim_g': g_optim.state_dict(),
                         'config': config,
                         'step': step
                     }, f'checkpoints/best_model_{model_name}.pt')
