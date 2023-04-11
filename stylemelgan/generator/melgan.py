@@ -16,6 +16,15 @@ MAX_WAV_VALUE = 32768.0
 
 
 
+class IstftUpsample(nn.Module):
+
+    def __init__(self, window, stride):
+        self.torch_istft = TorchSTFT(win_length=window, filter_length=window, hop_length=stride)
+
+
+    def forward(self, a, b):
+        return self.torch_istft.inverse(a, b)
+
 class ResStack(nn.Module):
     def __init__(self, channel, num_layers=4):
         super(ResStack, self).__init__()
@@ -73,10 +82,15 @@ class Generator(nn.Module):
             ResStack(64, num_layers=8),
 
             nn.LeakyReLU(0.2),
+            nn.utils.weight_norm(nn.ConvTranspose1d(64, 32, kernel_size=4, stride=2, padding=1)),
+
+            ResStack(32, num_layers=8),
+
+            nn.LeakyReLU(0.2),
         )
 
         self.post_n_fft = 4
-        self.conv_post = weight_norm(Conv1d(64, self.post_n_fft + 2, 7, 1, padding=3))
+        self.conv_post = weight_norm(Conv1d(32, self.post_n_fft + 2, 7, 1, padding=3))
         self.reflection_pad = torch.nn.ReflectionPad1d((1, 0))
 
     def forward(self, mel):
@@ -129,7 +143,7 @@ class Generator(nn.Module):
 if __name__ == '__main__':
     import time
     config = read_config('../configs/melgan_config.yaml')
-    torch_stft = TorchSTFT(filter_length=8, hop_length=2, win_length=8)
+    torch_stft = TorchSTFT(filter_length=4, hop_length=1, win_length=4)
     model = Generator(80)
     x = torch.randn(3, 80, 1000)
     start = time.time()
