@@ -11,7 +11,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from stylemelgan.audio import Audio
 from stylemelgan.dataset import new_dataloader, AudioDataset
-from stylemelgan.discriminator import MultiScaleDiscriminator,  MultiPeriodDiscriminator
+from stylemelgan.discriminator import MultiScaleDiscriminator, MultiPeriodDiscriminator, MultiSubBandDiscriminator
 from stylemelgan.generator.melgan import Generator
 from stylemelgan.losses import stft, MultiResStftLoss
 from stylemelgan.utils import read_config
@@ -47,7 +47,7 @@ if __name__ == '__main__':
 
     g_model = Generator(audio.n_mels).to(device)
     d_model = MultiScaleDiscriminator().to(device)
-    p_model = MultiPeriodDiscriminator().to(device)
+    p_model = MultiSubBandDiscriminator().to(device)
     train_cfg = config['training']
     g_optim = torch.optim.Adam(g_model.parameters(), lr=train_cfg['g_lr'], betas=(0.5, 0.9))
     d_optim = torch.optim.Adam(d_model.parameters(), lr=train_cfg['d_lr'], betas=(0.5, 0.9))
