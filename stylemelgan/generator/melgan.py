@@ -80,14 +80,9 @@ class Generator(nn.Module):
         )
 
         self.res_generator = nn.Sequential(
-            nn.utils.weight_norm(nn.ConvTranspose1d(128, 64, kernel_size=4, stride=2, padding=1)),
+            nn.utils.weight_norm(nn.Conv1d(1, 32, kernel_size=7, stride=1, padding=3)),
 
-            ResStack(64, num_layers=8),
-
-            nn.LeakyReLU(0.2),
-            nn.utils.weight_norm(nn.ConvTranspose1d(64, 32, kernel_size=4, stride=2, padding=1)),
-
-            ResStack(32, num_layers=8),
+            ResStack(32, num_layers=9),
 
             nn.LeakyReLU(0.2),
             nn.ReflectionPad1d(3),
@@ -103,14 +98,13 @@ class Generator(nn.Module):
     def forward(self, mel):
         mel = (mel + 5.0) / 5.0 # roughly normalize spectrogram
         x = self.generator(mel)
-        x_res = x
         x = self.reflection_pad(x)
         x = self.conv_post(x)
         spec = torch.exp(x[:, :self.post_n_fft // 2 + 1, :])
         phase = torch.sin(x[:, self.post_n_fft // 2 + 1:, :])
         x = self.torch_stft.inverse(spec, phase)
 
-        x_res = self.res_generator(x_res)
+        x_res = self.res_generator(x)
         x = x + x_res
 
         return x
