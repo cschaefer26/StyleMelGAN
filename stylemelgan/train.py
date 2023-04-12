@@ -99,8 +99,8 @@ if __name__ == '__main__':
             wav_real = data['wav'].to(device)
 
             spec, phase = g_model(mel)
-            #wav_fake = g_model(mel)[:, :, :train_cfg['segment_len']]
-            wav_fake = torch_stft.inverse(spec, phase)
+            wav_fake = g_model(mel)[:, :, :train_cfg['segment_len']]
+            #wav_fake = torch_stft.inverse(spec, phase)
 
             #print(wav_fake.size())
 
@@ -178,8 +178,8 @@ if __name__ == '__main__':
                 for i, val_data in enumerate(val_dataset):
                     val_mel = val_data['mel'].to(device)
                     val_mel = val_mel.unsqueeze(0)
-                    s, p = g_model.inference(val_mel)
-                    wav_fake = torch_stft.inverse(s, p)
+                    wav_fake = g_model.inference(val_mel)
+                    #wav_fake = torch_stft.inverse(s, p)
                     wav_fake = wav_fake.squeeze().cpu().numpy()
                     wav_real = val_data['wav'].detach().squeeze().cpu().numpy()
                     wav_f = torch.tensor(wav_fake).unsqueeze(0).to(device)
