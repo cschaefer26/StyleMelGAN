@@ -98,7 +98,7 @@ if __name__ == '__main__':
             mel = data['mel'].to(device)
             wav_real = data['wav'].to(device)
 
-            spec, phase = g_model(mel)
+            #spec, phase = g_model(mel)
             wav_fake = g_model(mel)[:, :, :train_cfg['segment_len']]
             #wav_fake = torch_stft.inverse(spec, phase)
 
