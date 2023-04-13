@@ -104,8 +104,7 @@ class Generator(nn.Module):
         phase = torch.sin(x[:, self.post_n_fft // 2 + 1:, :])
         x = self.torch_stft.inverse(spec, phase)
 
-        x_res = self.res_generator(x)
-        x = x + x_res
+        x = self.res_generator(x)
 
         return x
 
