@@ -136,34 +136,35 @@ class MultiScaleDiscriminator(nn.Module):
         return ret  # [(feat, score), (feat, score), (feat, score)]
 
 
-class DiscriminatorP(torch.nn.Module):
-    def __init__(self, period, kernel_size=5, stride=3, use_spectral_norm=False):
-        super(DiscriminatorP, self).__init__()
-        self.period = period
-        norm_f = weight_norm if use_spectral_norm == False else spectral_norm
+class DiscriminatorR(nn.Module):
+    def __init__(self, resolution):
+        super().__init__()
+
+        self.resolution = resolution
+        assert len(self.resolution) == 3, \
+            "MRD layer requires list with len=3, got {}".format(self.resolution)
+        self.lrelu_slope = LRELU_SLOPE
+
+        norm_f = weight_norm
+        self.d_mult = 1
+
         self.convs = nn.ModuleList([
-            norm_f(Conv2d(1, 32, (kernel_size, 1), (stride, 1), padding=(get_padding(5, 1), 0))),
-            norm_f(Conv2d(32, 128, (kernel_size, 1), (stride, 1), padding=(get_padding(5, 1), 0))),
-            norm_f(Conv2d(128, 512, (kernel_size, 1), (stride, 1), padding=(get_padding(5, 1), 0))),
-            norm_f(Conv2d(512, 1024, (kernel_size, 1), (stride, 1), padding=(get_padding(5, 1), 0))),
-            norm_f(Conv2d(1024, 1024, (kernel_size, 1), 1, padding=(2, 0))),
+            norm_f(nn.Conv2d(1, int(32*self.d_mult), (3, 9), padding=(1, 4))),
+            norm_f(nn.Conv2d(int(32*self.d_mult), int(32*self.d_mult), (3, 9), stride=(1, 2), padding=(1, 4))),
+            norm_f(nn.Conv2d(int(32*self.d_mult), int(32*self.d_mult), (3, 9), stride=(1, 2), padding=(1, 4))),
+            norm_f(nn.Conv2d(int(32*self.d_mult), int(32*self.d_mult), (3, 9), stride=(1, 2), padding=(1, 4))),
+            norm_f(nn.Conv2d(int(32*self.d_mult), int(32*self.d_mult), (3, 3), padding=(1, 1))),
         ])
-        self.conv_post = norm_f(Conv2d(1024, 1, (3, 1), 1, padding=(1, 0)))
+        self.conv_post = norm_f(nn.Conv2d(int(32 * self.d_mult), 1, (3, 3), padding=(1, 1)))
 
     def forward(self, x):
         fmap = []
 
-        # 1d to 2d
-        b, c, t = x.shape
-        if t % self.period != 0: # pad first
-            n_pad = self.period - (t % self.period)
-            x = F.pad(x, (0, n_pad), "reflect")
-            t = t + n_pad
-        x = x.view(b, c, t // self.period, self.period)
-
+        x = self.spectrogram(x)
+        x = x.unsqueeze(1)
         for l in self.convs:
             x = l(x)
-            x = F.leaky_relu(x, LRELU_SLOPE)
+            x = F.leaky_relu(x, self.lrelu_slope)
             fmap.append(x)
         x = self.conv_post(x)
         fmap.append(x)
@@ -171,16 +172,24 @@ class DiscriminatorP(torch.nn.Module):
 
         return fmap, x
 
+    def spectrogram(self, x):
+        n_fft, hop_length, win_length = self.resolution
+        x = F.pad(x, (int((n_fft - hop_length) / 2), int((n_fft - hop_length) / 2)), mode='reflect')
+        x = x.squeeze(1)
+        x = torch.stft(x, n_fft=n_fft, hop_length=hop_length, win_length=win_length, center=False, return_complex=True)
+        x = torch.view_as_real(x)  # [B, F, TT, 2]
+        mag = torch.norm(x, p=2, dim=-1) #[B, F, TT]
 
-class MultiPeriodDiscriminator(torch.nn.Module):
+        return mag
+
+
+class MultiSpecDiscriminator(torch.nn.Module):
     def __init__(self):
-        super(MultiPeriodDiscriminator, self).__init__()
+        super().__init__()
         self.discriminators = nn.ModuleList([
-            DiscriminatorP(2),
-            DiscriminatorP(3),
-            DiscriminatorP(5),
-            DiscriminatorP(7),
-            DiscriminatorP(11),
+            DiscriminatorR([1024, 2048, 512]),
+            DiscriminatorR([120, 240, 50]),
+            DiscriminatorR([600, 1200, 240]),
         ])
 
     def forward(self, y):
@@ -192,7 +201,7 @@ class MultiPeriodDiscriminator(torch.nn.Module):
 
 
 if __name__ == '__main__':
-    model = MultiPeriodDiscriminator()
+    model = MultiSpecDiscriminator()
 
     x = torch.randn(3, 1, 22050)
     print(x.shape)
