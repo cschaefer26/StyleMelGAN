@@ -187,9 +187,9 @@ class MultiSpecDiscriminator(torch.nn.Module):
     def __init__(self):
         super().__init__()
         self.discriminators = nn.ModuleList([
-            DiscriminatorR([1024, 2048, 512]),
-            DiscriminatorR([120, 240, 50]),
-            DiscriminatorR([600, 1200, 240]),
+            DiscriminatorR([1024, 120, 600]),
+            DiscriminatorR([2048, 240, 1200]),
+            DiscriminatorR([512, 50, 240]),
         ])
 
     def forward(self, y):
