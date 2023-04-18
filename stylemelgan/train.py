@@ -11,7 +11,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from stylemelgan.audio import Audio
 from stylemelgan.dataset import new_dataloader, AudioDataset
-from stylemelgan.discriminator import MultiScaleDiscriminator,  MultiSpecDiscriminator
+from stylemelgan.discriminator import MultiScaleDiscriminator, MultiSpecDiscriminator, MultiPeriodDiscriminator
 from stylemelgan.generator.melgan import Generator
 from stylemelgan.losses import stft, MultiResStftLoss
 from stylemelgan.utils import read_config
@@ -46,7 +46,7 @@ if __name__ == '__main__':
     step = 0
 
     g_model = Generator(audio.n_mels).to(device)
-    d_model = MultiScaleDiscriminator().to(device)
+    d_model = MultiPeriodDiscriminator().to(device)
     p_model = MultiSpecDiscriminator().to(device)
     train_cfg = config['training']
     g_optim = torch.optim.Adam(g_model.parameters(), lr=train_cfg['g_lr'], betas=(0.5, 0.9))
@@ -106,16 +106,17 @@ if __name__ == '__main__':
             stft_spec_loss = 0.0
 
             if step > pretraining_steps:
-                # discriminator
+
+                # discriminator d
                 d_fake = d_model(wav_fake.detach())
                 d_real = d_model(wav_real)
                 for (_, score_fake), (_, score_real) in zip(d_fake, d_real):
-                    d_loss += torch.mean(torch.sum(torch.pow(score_real - 1.0, 2), dim=[1, 2]))
-                    d_loss += torch.mean(torch.sum(torch.pow(score_fake, 2), dim=[1, 2]))
+                    d_loss += torch.mean(torch.pow(score_real - 1.0, 2))
+                    d_loss += torch.mean(torch.pow(score_fake, 2))
                 d_optim.zero_grad()
                 d_loss.backward()
                 d_optim.step()
-
+                
                 # discriminator p
                 p_fake = p_model(wav_fake.detach())
                 p_real = p_model(wav_real)
@@ -129,18 +130,18 @@ if __name__ == '__main__':
                 # generator
                 d_fake = d_model(wav_fake)
                 for (feat_fake, score_fake), (feat_real, _) in zip(d_fake, d_real):
-                    g_loss += torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
+                    g_loss += torch.mean(torch.pow(score_fake - 1.0, 2))
                     for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
-                        g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
+                        g_loss += 2. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
                 # generator p
                 p_fake = p_model(wav_fake)
                 for (feat_fake, score_fake), (feat_real, _) in zip(p_fake, p_real):
                     gp_loss += torch.mean(torch.pow(score_fake - 1.0, 2))
                     for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
-                        gp_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
+                        gp_loss += 2. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
-            factor = 10. if step < pretraining_steps else 10.
+            factor = 100. if step < pretraining_steps else 100.
 
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
             g_loss_all = g_loss + gp_loss + factor * (stft_norm_loss + stft_spec_loss)
