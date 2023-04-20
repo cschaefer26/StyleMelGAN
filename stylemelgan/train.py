@@ -121,7 +121,7 @@ if __name__ == '__main__':
                                                      center=False)
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
             #mel_loss = F.l1_loss(mel_fake, mel)
-            mel_loss = torch.abs(torch.exp(mel_fake) - torch.exp(mel)).mean()
+            mel_loss = F.mse_loss(torch.exp(mel_fake), torch.exp(mel))
             #mel_loss = mel_loss.mean(dim=1)
             #mel_loss = mel_loss ** 2
             mel_loss = 1000. * mel_loss.mean()
