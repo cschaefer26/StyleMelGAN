@@ -179,13 +179,10 @@ if __name__ == '__main__':
                 val_wavs.sort(key=lambda x: x[1].shape[0])
                 wav_fake, wav_real, mel_val = val_wavs[-1]
                 if mel_pred_loss < best_mel_loss:
-                    best_stft = val_norm_loss + val_spec_loss
-                    print(f'\nnew best pred: {best_stft}')
+                    best_mel_loss = mel_pred_loss
+                    print(f'\nnew best pred: {best_mel_loss}')
                     torch.save({
-                        'g_model_g': g_model.state_dict(),
-                        'g_optim_g': g_optim.state_dict(),
-                        'model_d': d_model.state_dict(),
-                        'optim_d': d_optim.state_dict(),
+                        'model_g': g_model.state_dict(),
                         'config': config,
                         'step': step
                     }, f'checkpoints/best_model_{model_name}.pt')
