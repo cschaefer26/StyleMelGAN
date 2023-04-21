@@ -81,8 +81,6 @@ class MelDataset(Dataset):
         self.segment_len = segment_len
         self.padding_val = padding_val
         self.file_ids = [n.stem for n in mel_names]
-        if segment_len is not None:
-            self.mel_segment_len = segment_len // hop_len + 2
 
     def __len__(self):
         return len(self.file_ids)
@@ -91,7 +89,7 @@ class MelDataset(Dataset):
         file_id = self.file_ids[item_id]
         mel_path = self.data_path / f'{file_id}.mel'
         mel = torch.load(mel_path)
-        mel_pad_len = 2 * self.mel_segment_len - mel.size(-1)
+        mel_pad_len = 2 * 16000 - mel.size(-1)
         if mel_pad_len > 0:
             mel_pad = torch.full((mel.size(0), mel_pad_len), fill_value=self.padding_val)
             mel = torch.cat([mel, mel_pad], dim=-1)
