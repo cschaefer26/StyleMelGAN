@@ -87,11 +87,11 @@ if __name__ == '__main__':
 
     summary_writer = SummaryWriter(log_dir=f'checkpoints/logs_{model_name}')
 
-    best_stft = 9999
+    best_mel_loss = 9999
 
     for epoch in range(train_cfg['epochs']):
-        pbar = tqdm.tqdm(enumerate(zip(dataloader, mel_dataloader), 1), total=len(dataloader))
-        for i, (data, data_mel) in pbar:
+        pbar = tqdm.tqdm(enumerate(dataloader, 1), total=len(dataloader))
+        for i, data in pbar:
             step += 1
             mel = data['mel'].to(device)
             wav_real = data['wav'].to(device)
@@ -130,25 +130,15 @@ if __name__ == '__main__':
             g_loss_all.backward()
             g_optim.step()
 
-            mel_pred = data_mel['mel'].to(device)
 
-            wav_pred_fake = g_model(mel_pred)
-            mel_fake = mel_spectrogram(wav_pred_fake.squeeze(1), n_fft=1024, num_mels=80, sampling_rate=22050, hop_size=256,
-                                       win_size=1024, fmin=0, fmax=8000)
-            mel_pred_loss = 10000. * F.mse_loss(torch.exp(mel_fake), torch.exp(mel_pred))
-            g_optim.zero_grad()
-            mel_pred_loss.backward()
-            g_optim.step()
 
             pbar.set_description(desc=f'Epoch: {epoch} | Step {step} '
                                       f'| g_loss: {g_loss:#.4} '
                                       f'| d_loss: {d_loss:#.4} '
                                       f'| stft_norm_loss {stft_norm_loss:#.4} '
-                                      f'| mel_pred_loss {mel_pred_loss:#.4} '
                                       f'| stft_spec_loss {stft_spec_loss:#.4} ', refresh=True)
 
             summary_writer.add_scalar('generator_loss', g_loss, global_step=step)
-            summary_writer.add_scalar('generator_mel_pred_loss', mel_pred_loss, global_step=step)
             summary_writer.add_scalar('stft_norm_loss', stft_norm_loss, global_step=step)
             summary_writer.add_scalar('stft_spec_loss', stft_spec_loss, global_step=step)
             summary_writer.add_scalar('discriminator_loss', d_loss, global_step=step)
@@ -158,6 +148,16 @@ if __name__ == '__main__':
                 val_norm_loss = 0
                 val_spec_loss = 0
                 val_wavs = []
+                val_pred_loss = 0
+
+                for data_mel in tqdm.tqdm(mel_dataloader, total=len(mel_dataloader)):
+                    mel_pred = data_mel['mel'].to(device)
+                    with torch.no_grad():
+                        wav_pred_fake = g_model(mel_pred)
+                        mel_fake = mel_spectrogram(wav_pred_fake.squeeze(1), n_fft=1024, num_mels=80, sampling_rate=22050, hop_size=256,
+                                                   win_size=1024, fmin=0, fmax=8000)
+                        mel_pred_loss = F.mse_loss(torch.exp(mel_fake), torch.exp(mel_pred))
+                        val_pred_loss += mel_pred_loss
 
                 for i, val_data in enumerate(val_dataset):
                     val_mel = val_data['mel'].to(device)
@@ -178,9 +178,9 @@ if __name__ == '__main__':
                 summary_writer.add_scalar('val_stft_spec_loss', val_spec_loss, global_step=step)
                 val_wavs.sort(key=lambda x: x[1].shape[0])
                 wav_fake, wav_real, mel_val = val_wavs[-1]
-                if val_norm_loss + val_spec_loss < best_stft:
+                if mel_pred_loss < best_mel_loss:
                     best_stft = val_norm_loss + val_spec_loss
-                    print(f'\nnew best stft: {best_stft}')
+                    print(f'\nnew best pred: {best_stft}')
                     torch.save({
                         'g_model_g': g_model.state_dict(),
                         'g_optim_g': g_optim.state_dict(),
