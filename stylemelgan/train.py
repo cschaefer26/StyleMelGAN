@@ -156,6 +156,7 @@ if __name__ == '__main__':
                                                    win_size=1024, fmin=0, fmax=8000)
                         mel_pred_loss = F.mse_loss(torch.exp(mel_fake), torch.exp(mel_pred))
                         val_pred_loss += mel_pred_loss
+                summary_writer.add_scalar('val_pred_loss', val_pred_loss, global_step=step)
 
                 for i, val_data in enumerate(val_dataset):
                     val_mel = val_data['mel'].to(device)
