@@ -89,7 +89,7 @@ class MelDataset(Dataset):
         file_id = self.file_ids[item_id]
         mel_path = self.data_path / f'{file_id}.mel'
         mel = torch.load(mel_path)
-        mel_pad_len = 2 * 16000 - mel.size(-1)
+        mel_pad_len = 100 - mel.size(-1)
         if mel_pad_len > 0:
             mel_pad = torch.full((mel.size(0), mel_pad_len), fill_value=self.padding_val)
             mel = torch.cat([mel, mel_pad], dim=-1)
