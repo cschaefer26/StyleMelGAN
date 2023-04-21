@@ -91,15 +91,10 @@ class MelDataset(Dataset):
         file_id = self.file_ids[item_id]
         mel_path = self.data_path / f'{file_id}.mel'
         mel = torch.load(mel_path)
-        if self.segment_len is not None:
-            mel_pad_len = 2 * self.mel_segment_len - mel.size(-1)
-            if mel_pad_len > 0:
-                mel_pad = torch.full((mel.size(0), mel_pad_len), fill_value=self.padding_val)
-                mel = torch.cat([mel, mel_pad], dim=-1)
-            max_mel_start = mel.size(-1) - self.mel_segment_len
-            mel_start = random.randint(0, max_mel_start)
-            mel_end = mel_start + self.mel_segment_len
-            mel = mel[:, mel_start:mel_end]
+        mel_pad_len = 2 * self.mel_segment_len - mel.size(-1)
+        if mel_pad_len > 0:
+            mel_pad = torch.full((mel.size(0), mel_pad_len), fill_value=self.padding_val)
+            mel = torch.cat([mel, mel_pad], dim=-1)
         return {'mel': mel}
 
 

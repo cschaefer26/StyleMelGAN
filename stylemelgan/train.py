@@ -130,8 +130,6 @@ if __name__ == '__main__':
             g_loss_all.backward()
             g_optim.step()
 
-
-
             pbar.set_description(desc=f'Epoch: {epoch} | Step {step} '
                                       f'| g_loss: {g_loss:#.4} '
                                       f'| d_loss: {d_loss:#.4} '
@@ -178,8 +176,8 @@ if __name__ == '__main__':
                 summary_writer.add_scalar('val_stft_spec_loss', val_spec_loss, global_step=step)
                 val_wavs.sort(key=lambda x: x[1].shape[0])
                 wav_fake, wav_real, mel_val = val_wavs[-1]
-                if mel_pred_loss < best_mel_loss:
-                    best_mel_loss = mel_pred_loss
+                if val_pred_loss < best_mel_loss:
+                    best_mel_loss = val_pred_loss
                     print(f'\nnew best pred: {best_mel_loss}')
                     torch.save({
                         'model_g': g_model.state_dict(),
