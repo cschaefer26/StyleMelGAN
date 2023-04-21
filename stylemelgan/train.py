@@ -68,7 +68,6 @@ if __name__ == '__main__':
     except Exception as e:
         print(e)
         raise ValueError(e)
-        'Initializing model from scratch.'
 
     train_cfg = config['training']
     dataloader = new_dataloader(data_path=train_data_path, segment_len=train_cfg['segment_len'],
