@@ -121,11 +121,13 @@ if __name__ == '__main__':
                                                      center=False)
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
             #mel_loss = F.l1_loss(mel_fake, mel)
-            mel_loss = F.mse_loss(torch.exp(mel_fake), torch.exp(mel))
+            #mel_loss = F.mse_loss(torch.exp(mel_fake), torch.exp(mel))
+            mel_loss = 50 * torch.norm(torch.exp(mel_fake) - torch.exp(mel), p="fro") / torch.norm(torch.exp(mel), p="fro")
+
             #mel_loss = mel_loss.mean(dim=1)
             #mel_loss = mel_loss ** 2
-            mel_loss = 1000. * mel_loss.mean()
-            print(mel_loss)
+            #mel_loss = 1000. * mel_loss.mean()
+            #print(mel_loss)
 
             g_loss_all = g_loss + mel_loss
 
@@ -136,6 +138,7 @@ if __name__ == '__main__':
             pbar.set_description(desc=f'Epoch: {epoch} | Step {step} '
                                       f'| g_loss: {g_loss:#.4} '
                                       f'| d_loss: {d_loss:#.4} '
+                                      f'| mel_loss: {mel_loss:#.4} '
                                       f'| stft_norm_loss {stft_norm_loss:#.4} '
                                       f'| stft_spec_loss {stft_spec_loss:#.4} ', refresh=True)
 
