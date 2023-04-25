@@ -122,14 +122,15 @@ if __name__ == '__main__':
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
             #mel_loss = F.l1_loss(mel_fake, mel)
             #mel_loss = F.mse_loss(torch.exp(mel_fake), torch.exp(mel))
-            mel_loss = 50 * torch.norm(torch.exp(mel_fake) - torch.exp(mel), p="fro") / torch.norm(torch.exp(mel), p="fro")
+            mel_loss_exp = 25 * torch.norm(torch.exp(mel_fake) - torch.exp(mel), p="fro") / torch.norm(torch.exp(mel), p="fro")
+            mel_loss_log = 25 * F.l1_loss(mel_fake, mel)
 
             #mel_loss = mel_loss.mean(dim=1)
             #mel_loss = mel_loss ** 2
             #mel_loss = 1000. * mel_loss.mean()
             #print(mel_loss)
 
-            g_loss_all = g_loss + mel_loss
+            g_loss_all = g_loss + mel_loss_log + mel_loss_exp
 
             g_optim.zero_grad()
             g_loss_all.backward()
@@ -138,12 +139,14 @@ if __name__ == '__main__':
             pbar.set_description(desc=f'Epoch: {epoch} | Step {step} '
                                       f'| g_loss: {g_loss:#.4} '
                                       f'| d_loss: {d_loss:#.4} '
-                                      f'| mel_loss: {mel_loss:#.4} '
+                                      f'| mel_loss: {mel_loss_exp:#.4} '
+                                      f'| mel_loss_log: {mel_loss_log:#.4} '
                                       f'| stft_norm_loss {stft_norm_loss:#.4} '
                                       f'| stft_spec_loss {stft_spec_loss:#.4} ', refresh=True)
 
             summary_writer.add_scalar('generator_loss', g_loss, global_step=step)
-            summary_writer.add_scalar('mel_loss', mel_loss, global_step=step)
+            summary_writer.add_scalar('mel_loss_fro', mel_loss_exp, global_step=step)
+            summary_writer.add_scalar('mel_loss_log', mel_loss_log, global_step=step)
             summary_writer.add_scalar('discriminator_loss', d_loss, global_step=step)
             summary_writer.add_scalar('stft_norm_loss', stft_norm_loss, global_step=step)
             summary_writer.add_scalar('stft_spec_loss', stft_spec_loss, global_step=step)
