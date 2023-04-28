@@ -49,8 +49,11 @@ if __name__ == '__main__':
     d_model = MultiScaleDiscriminator().to(device)
     train_cfg = config['training']
     g_optim = torch.optim.Adam(g_model.parameters(), lr=train_cfg['g_lr'], betas=(0.5, 0.9))
+    g_optim_2 = torch.optim.Adam(g_model.generator._modules['1'].parameters(), lr=train_cfg['g_lr'], betas=(0.5, 0.9))
     d_optim = torch.optim.Adam(d_model.parameters(), lr=train_cfg['d_lr'], betas=(0.5, 0.9))
     for g in g_optim.param_groups:
+        g['lr'] = train_cfg['g_lr']
+    for g in g_optim_2.param_groups:
         g['lr'] = train_cfg['g_lr']
     for g in d_optim.param_groups:
         g['lr'] = train_cfg['d_lr']
@@ -60,6 +63,7 @@ if __name__ == '__main__':
         checkpoint = torch.load(f'checkpoints/latest_model__{model_name}.pt', map_location=device)
         g_model.load_state_dict(checkpoint['model_g'])
         g_optim.load_state_dict(checkpoint['optim_g'])
+        g_optim_2.load_state_dict(checkpoint['optim_g_2'])
         d_model.load_state_dict(checkpoint['model_d'])
         d_optim.load_state_dict(checkpoint['optim_d'])
         step = checkpoint['step']
@@ -114,39 +118,33 @@ if __name__ == '__main__':
                     for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
                         g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
-            factor = 1. if step < pretraining_steps else 0.
+            factor = 100. if step < pretraining_steps else 0.
 
-            mel_fake = mel_spectrogram(wav_fake.squeeze(1), 1024, 80,
-                                                     22050, 256, 1024, 0, 8000,
-                                                     center=False)
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
-            #mel_loss = F.l1_loss(mel_fake, mel)
-            #mel_loss = F.mse_loss(torch.exp(mel_fake), torch.exp(mel))
-            mel_loss_exp = 25 * torch.norm(torch.exp(mel_fake) - torch.exp(mel), p="fro") / torch.norm(torch.exp(mel), p="fro")
-            mel_loss_log = 25 * F.l1_loss(mel_fake, mel)
-
-            #mel_loss = mel_loss.mean(dim=1)
-            #mel_loss = mel_loss ** 2
-            #mel_loss = 1000. * mel_loss.mean()
-            #print(mel_loss)
-
-            g_loss_all = g_loss + mel_loss_log + mel_loss_exp
+            g_loss_all = g_loss + factor * (stft_norm_loss + stft_spec_loss)
 
             g_optim.zero_grad()
             g_loss_all.backward()
             g_optim.step()
 
+            g_optim_2.zero_grad()
+            wav_fake = g_model(mel)[:, :, :train_cfg['segment_len']]
+            mel_fake = mel_spectrogram(wav_fake.squeeze(1), 1024, 80,
+                                       22050, 256, 1024, 0, 8000,
+                                       center=False)
+            mel_loss_exp = 20 * torch.norm(torch.exp(mel_fake) - torch.exp(mel), p="fro") / torch.norm(torch.exp(mel), p="fro")
+            mel_loss_exp.backward()
+            g_optim_2.step()
+
             pbar.set_description(desc=f'Epoch: {epoch} | Step {step} '
                                       f'| g_loss: {g_loss:#.4} '
                                       f'| d_loss: {d_loss:#.4} '
-                                      f'| mel_loss: {mel_loss_exp:#.4} '
-                                      f'| mel_loss_log: {mel_loss_log:#.4} '
+                                      f'| mel_loss_exp: {mel_loss_exp:#.4} '
                                       f'| stft_norm_loss {stft_norm_loss:#.4} '
                                       f'| stft_spec_loss {stft_spec_loss:#.4} ', refresh=True)
 
             summary_writer.add_scalar('generator_loss', g_loss, global_step=step)
             summary_writer.add_scalar('mel_loss_fro', mel_loss_exp, global_step=step)
-            summary_writer.add_scalar('mel_loss_log', mel_loss_log, global_step=step)
             summary_writer.add_scalar('discriminator_loss', d_loss, global_step=step)
             summary_writer.add_scalar('stft_norm_loss', stft_norm_loss, global_step=step)
             summary_writer.add_scalar('stft_spec_loss', stft_spec_loss, global_step=step)
@@ -180,10 +178,8 @@ if __name__ == '__main__':
                     best_stft = val_norm_loss + val_spec_loss
                     print(f'\nnew best stft: {best_stft}')
                     torch.save({
-                        'g_model_g': g_model.state_dict(),
-                        'g_optim_g': g_optim.state_dict(),
-                        'model_d': d_model.state_dict(),
-                        'optim_d': d_optim.state_dict(),
+                        'model_g': g_model.state_dict(),
+                        'optim_g': g_optim.state_dict(),
                         'config': config,
                         'step': step
                     }, f'checkpoints/best_model_{model_name}.pt')
@@ -203,6 +199,7 @@ if __name__ == '__main__':
         torch.save({
             'model_g': g_model.state_dict(),
             'optim_g': g_optim.state_dict(),
+            'optim_g_2': g_optim_2.state_dict(),
             'model_d': d_model.state_dict(),
             'optim_d': d_optim.state_dict(),
             'config': config,
