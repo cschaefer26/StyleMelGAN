@@ -128,12 +128,12 @@ if __name__ == '__main__':
             g_loss_all.backward()
             g_optim.step()
 
-            g_optim_2.zero_grad()
             wav_fake = g_model(mel)[:, :, :train_cfg['segment_len']]
             mel_fake = mel_spectrogram(wav_fake.squeeze(1), 1024, 80,
                                        22050, 256, 1024, 0, 8000,
                                        center=False)
             mel_loss_exp = 20 * torch.norm(torch.exp(mel_fake) - torch.exp(mel), p="fro") / torch.norm(torch.exp(mel), p="fro")
+            g_optim_2.zero_grad()
             mel_loss_exp.backward()
             g_optim_2.step()
 
