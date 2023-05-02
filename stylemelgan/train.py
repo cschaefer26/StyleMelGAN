@@ -69,6 +69,7 @@ if __name__ == '__main__':
         step = checkpoint['step']
         print(f'Loaded model with step {step}')
     except Exception as e:
+        raise ValueError(e)
         'Initializing model from scratch.'
 
     train_cfg = config['training']
