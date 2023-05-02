@@ -63,7 +63,7 @@ if __name__ == '__main__':
         checkpoint = torch.load(f'checkpoints/latest_model__{model_name}.pt', map_location=device)
         g_model.load_state_dict(checkpoint['model_g'])
         g_optim.load_state_dict(checkpoint['optim_g'])
-        g_optim_2.load_state_dict(checkpoint['optim_g_2'])
+        #g_optim_2.load_state_dict(checkpoint['optim_g_2'])
         d_model.load_state_dict(checkpoint['model_d'])
         d_optim.load_state_dict(checkpoint['optim_d'])
         step = checkpoint['step']
