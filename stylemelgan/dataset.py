@@ -77,10 +77,11 @@ class AudioDataset(Dataset):
                  padding_val: float = -11.5129) -> None:
         wav_names = list(data_path.glob('**/*.wav'))
         wav_names = [w.stem for w in wav_names]
-        semb_names = set(semb_path.glob('**/*.npy'))
-        semb_names = [s.stem for s in semb_names]
-        wav_names = [w for w in wav_names if w in semb_names]
         print(f'Init audio dataset with num wavs: {len(wav_names)}')
+        semb_names = set(semb_path.glob('**/*.npy'))
+        semb_names = {s.stem for s in semb_names}
+        wav_names = [w for w in wav_names if w in semb_names]
+        print(f'Filtered audio dataset with num wavs: {len(wav_names)}')
 
         self.data_path = data_path
         self.semb_path = semb_path
