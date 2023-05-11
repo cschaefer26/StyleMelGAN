@@ -3,6 +3,7 @@ model_name: 'bild_aug'
 
 paths:
   train_dir: '/Users/cschaefe/datasets/bild_melgan_small'
+  semb_dir: '/Users/cschaefe/datasets/multispeaker_all_data/speaker_emb'
   val_dir: '/Users/cschaefe/datasets/bild_melgan_small'
   checkpoints: 'stylemelgan/checkpoints'
 

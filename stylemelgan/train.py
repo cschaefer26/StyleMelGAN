@@ -38,6 +38,7 @@ if __name__ == '__main__':
     model_name = config['model_name']
     audio = Audio.from_config(config)
     train_data_path = Path(config['paths']['train_dir'])
+    train_semb_path = Path(config['paths']['semb_dir'])
     val_data_path = Path(config['paths']['val_dir'])
 
     device = torch.device('cuda') if is_available() else torch.device('cpu')
@@ -70,9 +71,10 @@ if __name__ == '__main__':
     train_cfg = config['training']
     dataloader = new_dataloader(data_path=train_data_path, segment_len=train_cfg['segment_len'],
                                 hop_len=audio.hop_length, batch_size=train_cfg['batch_size'],
-                                num_workers=train_cfg['num_workers'], sample_rate=audio.sample_rate)
+                                num_workers=train_cfg['num_workers'], sample_rate=audio.sample_rate,
+                                semb_path=train_semb_path)
     val_dataset = AudioDataset(data_path=val_data_path, segment_len=None, hop_len=audio.hop_length,
-                               sample_rate=audio.sample_rate)
+                               sample_rate=audio.sample_rate, semb_path=train_semb_path)
 
     stft = partial(stft, n_fft=1024, hop_length=256, win_length=1024)
 
@@ -87,9 +89,10 @@ if __name__ == '__main__':
         for i, data in pbar:
             step += 1
             mel = data['mel'].to(device)
+            semb = data['semb'].to(device)
             wav_real = data['wav'].to(device)
 
-            wav_fake = g_model(mel)[:, :, :train_cfg['segment_len']]
+            wav_fake = g_model(mel, semb)[:, :, :train_cfg['segment_len']]
 
             d_loss = 0.0
             g_loss = 0.0
@@ -114,7 +117,7 @@ if __name__ == '__main__':
                     for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
                         g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
-            factor = 1. if step < pretraining_steps else 0.
+            factor = 50. if step < pretraining_steps else 50.
 
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
             g_loss_all = g_loss + factor * (stft_norm_loss + stft_spec_loss)
@@ -143,7 +146,8 @@ if __name__ == '__main__':
                 for i, val_data in enumerate(val_dataset):
                     val_mel = val_data['mel'].to(device)
                     val_mel = val_mel.unsqueeze(0)
-                    wav_fake = g_model.inference(val_mel).squeeze().cpu().numpy()
+                    val_semb = val_data['semb'].to(device).unsqueeze(0)
+                    wav_fake = g_model.inference(val_mel, val_semb).squeeze().cpu().numpy()
                     wav_real = val_data['wav'].detach().squeeze().cpu().numpy()
                     wav_f = torch.tensor(wav_fake).unsqueeze(0).to(device)
                     wav_r = torch.tensor(wav_real).unsqueeze(0).to(device)
@@ -163,8 +167,8 @@ if __name__ == '__main__':
                     best_stft = val_norm_loss + val_spec_loss
                     print(f'\nnew best stft: {best_stft}')
                     torch.save({
-                        'g_model_g': g_model.state_dict(),
-                        'g_optim_g': g_optim.state_dict(),
+                        'model_g': g_model.state_dict(),
+                        'optim_g': g_optim.state_dict(),
                         'model_d': d_model.state_dict(),
                         'optim_d': d_optim.state_dict(),
                         'config': config,

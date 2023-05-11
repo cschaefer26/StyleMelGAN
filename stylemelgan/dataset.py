@@ -70,12 +70,14 @@ class AudioDataset(Dataset):
 
     def __init__(self,
                  data_path: Path,
+                 semb_path: Path,
                  hop_len: int,
                  segment_len: Union[int, None],
                  sample_rate: int,
                  padding_val: float = -11.5129) -> None:
         mel_names = list(data_path.glob('**/*.mel'))
         self.data_path = data_path
+        self.semb_path = semb_path
         self.hop_len = hop_len
         self.segment_len = segment_len
         self.padding_val = padding_val
@@ -90,11 +92,12 @@ class AudioDataset(Dataset):
     def __getitem__(self, item_id: int) -> Dict[str, torch.Tensor]:
         file_id = self.file_ids[item_id]
         wav_path = self.data_path / f'{file_id}.wav'
+        semb_path = self.semb_path / f'{file_id}.npy'
         wav, _ = librosa.load(wav_path, sr=self.sample_rate)
-        max_scale = min(0.95 / np.max(wav), 1.5)
+        semb = np.load(str(semb_path))
+        semb = torch.from_numpy(semb)
         audio = torch.tensor(wav).float().unsqueeze(0)
         if self.segment_len is not None:
-            audio = audio * float(np.random.uniform(low=0.5, high=max_scale))
             if audio.size(1) >= self.segment_len:
                 max_audio_start = audio.size(1) - self.segment_len
                 audio_start = random.randint(0, max_audio_start)
@@ -106,17 +109,19 @@ class AudioDataset(Dataset):
                               22050, 256, 1024, 0, 8000,
                               center=False)
 
-        return {'mel': mel.squeeze(), 'wav': audio}
+        return {'mel': mel.squeeze(), 'wav': audio, 'semb': semb}
 
 
 def new_dataloader(data_path: Path,
+                   semb_path: Path,
                    segment_len: int,
                    hop_len: int,
                    batch_size: int,
                    sample_rate: int,
                    num_workers: int = 0) -> DataLoader:
 
-    dataset = AudioDataset(data_path=data_path, segment_len=segment_len, hop_len=hop_len, sample_rate=sample_rate)
+    dataset = AudioDataset(data_path=data_path, semb_path=semb_path,
+                           segment_len=segment_len, hop_len=hop_len, sample_rate=sample_rate)
     dataloader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True,
                             num_workers=num_workers, pin_memory=True, drop_last=True)
     return dataloader

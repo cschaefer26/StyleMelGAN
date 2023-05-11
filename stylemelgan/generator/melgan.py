@@ -51,12 +51,14 @@ class Generator(nn.Module):
         super(Generator, self).__init__()
         self.mel_channel = mel_channel
 
-        self.generator = nn.Sequential(
+        self.prenet = nn.Sequential(
             nn.ReflectionPad1d(3),
-            nn.utils.weight_norm(nn.Conv1d(mel_channel, 512, kernel_size=7, stride=1)),
+            nn.utils.weight_norm(nn.Conv1d(mel_channel, 512, kernel_size=7, stride=1))
+        )
 
+        self.generator = nn.Sequential(
             nn.LeakyReLU(0.2),
-            nn.utils.weight_norm(nn.ConvTranspose1d(512, 256, kernel_size=16, stride=8, padding=4)),
+            nn.utils.weight_norm(nn.ConvTranspose1d(512 + 256, 256, kernel_size=16, stride=8, padding=4)),
 
             ResStack(256, num_layers=5),
 
@@ -81,9 +83,13 @@ class Generator(nn.Module):
             nn.Tanh(),
         )
 
-    def forward(self, mel):
+    def forward(self, mel, semb):
         mel = (mel + 5.0) / 5.0 # roughly normalize spectrogram
-        return self.generator(mel)
+        x = self.prenet(mel)
+        semb = semb[:, :, None]
+        semb = semb.repeat(1, 1, x.size(-1))
+        x = torch.cat([x, semb], dim=1)
+        return self.generator(x)
 
     def eval(self, inference=False):
         super(Generator, self).eval()
@@ -102,6 +108,7 @@ class Generator(nn.Module):
 
     def inference(self,
                   mel: torch.Tensor,
+                  semb: torch.Tensor,
                   pad_steps: int = 10) -> torch.Tensor:
         with torch.no_grad():
             pad = torch.full((1, 80, pad_steps), -11.5129).to(mel.device)
