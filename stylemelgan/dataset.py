@@ -75,14 +75,20 @@ class AudioDataset(Dataset):
                  segment_len: Union[int, None],
                  sample_rate: int,
                  padding_val: float = -11.5129) -> None:
-        mel_names = list(data_path.glob('**/*.mel'))
+        wav_names = list(data_path.glob('**/*.wav'))
+        wav_names = [w.stem for w in wav_names]
+        semb_names = set(semb_path.glob('**/*.npy'))
+        semb_names = [s.stem for s in semb_names]
+        wav_names = [w for w in wav_names if w in semb_names]
+        print(f'Init audio dataset with num wavs: {len(wav_names)}')
+
         self.data_path = data_path
         self.semb_path = semb_path
         self.hop_len = hop_len
         self.segment_len = segment_len
         self.padding_val = padding_val
         self.sample_rate = sample_rate
-        self.file_ids = [n.stem for n in mel_names]
+        self.file_ids = wav_names
         if segment_len is not None:
             self.mel_segment_len = segment_len // hop_len + 2
 
