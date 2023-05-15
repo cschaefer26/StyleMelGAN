@@ -15,31 +15,55 @@ import numpy as np
 MAX_WAV_VALUE = 32768.0
 
 
+def get_padding(kernel_size, dilation=1):
+    return int((kernel_size*dilation - dilation)/2)
 
-class ResStack(nn.Module):
-    def __init__(self, channel, num_layers=4):
-        super(ResStack, self).__init__()
+
+class ResBlock(nn.Module):
+
+    def __init__(self, channel, kernel_size=3, dilations=(1, 3, 5)):
+        super().__init__()
 
         self.blocks = nn.ModuleList([
             nn.Sequential(
                 nn.LeakyReLU(0.2),
-                nn.ReflectionPad1d(3**i),
-                nn.utils.weight_norm(nn.Conv1d(channel, channel, kernel_size=3, dilation=3**i)),
+                nn.ReflectionPad1d(get_padding(kernel_size=kernel_size, dilation=dilations[i])),
+                nn.utils.weight_norm(nn.Conv1d(channel, channel, kernel_size=kernel_size, dilation=dilations[i])),
                 nn.LeakyReLU(0.2),
                 nn.utils.weight_norm(nn.Conv1d(channel, channel, kernel_size=1)),
             )
-            for i in range(num_layers)
-        ])
-
-        self.shortcuts = nn.ModuleList([
-            nn.utils.weight_norm(nn.Conv1d(channel, channel, kernel_size=1))
-            for i in range(num_layers)
+            for i in range(len(dilations))
         ])
 
     def forward(self, x):
-        for block, shortcut in zip(self.blocks, self.shortcuts):
-            x = shortcut(x) + block(x)
+        for block in self.blocks:
+            x = x + block(x)
         return x
+
+    def remove_weight_norm(self):
+        for block in self.blocks:
+            nn.utils.remove_weight_norm(block[2])
+            nn.utils.remove_weight_norm(block[4])
+
+
+class ResStack(nn.Module):
+
+    def __init__(self, channel, kernel_sizes=(3, 7, 11), dilations=(1, 3, 5)):
+        super(ResStack, self).__init__()
+
+        self.blocks = nn.ModuleList([
+            ResBlock(channel, dilations=dilations, kernel_size=kernel_sizes[i])
+            for i in range(len(kernel_sizes))
+        ])
+
+    def forward(self, x):
+        xs = None
+        for block in self.blocks:
+            if xs is None:
+                xs = block(x)
+            else:
+                xs += block(x)
+        return xs / len(self.blocks)
 
     def remove_weight_norm(self):
         for block, shortcut in zip(self.blocks, self.shortcuts):
@@ -60,13 +84,13 @@ class Generator(nn.Module):
             nn.LeakyReLU(0.2),
             nn.utils.weight_norm(nn.ConvTranspose1d(512, 256, kernel_size=16, stride=8, padding=4)),
 
-            ResStack(256, num_layers=5),
+            ResStack(256, kernel_sizes=(3, 7, 11)),
 
             nn.LeakyReLU(0.2),
             nn.utils.weight_norm(nn.ConvTranspose1d(256, 128, kernel_size=16, stride=8, padding=4)),
 
-            ResStack(128, num_layers=7),
-            nn.LeakyReLU(0.2),
+            ResStack(128, kernel_sizes=(3, 7, 11)),
+            nn.LeakyReLU(0.2)
         )
 
         self.post_n_fft = 16
