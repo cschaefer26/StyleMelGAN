@@ -66,16 +66,14 @@ def mel_spectrogram(y, n_fft, num_mels, sampling_rate, hop_size, win_size, fmin,
     return spec
 
 
-
-
 class MelDataset(Dataset):
 
     def __init__(self,
-                 data_path: Path,
+                 files: list,
                  hop_len: int,
                  segment_len: Union[int, None],
                  padding_val: float = -11.5129) -> None:
-        mel_names = set(data_path.glob('**/*.pt'))
+        mel_names = set(files)
         self.data_path = data_path
         self.hop_len = hop_len
         self.segment_len = segment_len
@@ -156,13 +154,13 @@ class AudioDataset(Dataset):
 
 
 
-def new_mel_dataloader(data_path: Path,
+def new_mel_dataloader(files: list,
                        segment_len: int,
                        hop_len: int,
                        batch_size: int,
                        num_workers: int = 0) -> DataLoader:
 
-    dataset = MelDataset(data_path=data_path, segment_len=segment_len, hop_len=hop_len)
+    dataset = MelDataset(files=files, segment_len=segment_len, hop_len=hop_len)
     dataloader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True,
                             num_workers=num_workers, pin_memory=True, drop_last=True, persistent_workers=True)
     return dataloader

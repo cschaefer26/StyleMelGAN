@@ -74,7 +74,13 @@ if __name__ == '__main__':
                                 hop_len=audio.hop_length, batch_size=train_cfg['batch_size'],
                                 num_workers=train_cfg['num_workers'], sample_rate=audio.sample_rate)
 
-    mel_dataloader = new_mel_dataloader(data_path=train_pred_data_path, segment_len=train_cfg['segment_len'],
+    mel_files = list(train_pred_data_path.glob('**/*.pt'))
+    val_mel_files = mel_files[:2]
+    train_mel_files = mel_files[2:]
+    train_mel_dataloader = new_mel_dataloader(files=train_mel_files, segment_len=train_cfg['segment_len'],
+                                        hop_len=audio.hop_length, batch_size=train_cfg['batch_size'],
+                                        num_workers=train_cfg['num_workers'])
+    val_mel_dataloader = new_mel_dataloader(files=val_mel_files, segment_len=train_cfg['segment_len'],
                                         hop_len=audio.hop_length, batch_size=train_cfg['batch_size'],
                                         num_workers=train_cfg['num_workers'])
 
@@ -90,7 +96,7 @@ if __name__ == '__main__':
     best_stft = 9999
 
     for epoch in range(train_cfg['epochs']):
-        pbar = tqdm.tqdm(enumerate(zip(dataloader, mel_dataloader), 1), total=len(dataloader))
+        pbar = tqdm.tqdm(enumerate(zip(dataloader, train_mel_dataloader), 1), total=len(dataloader))
         for i, (data, data_mel) in pbar:
             step += 1
             mel = data['mel'].to(device)
@@ -191,6 +197,21 @@ if __name__ == '__main__':
                         'step': step
                     }, f'checkpoints/best_model_{model_name}.pt')
                     summary_writer.add_audio('best_generated', wav_fake, sample_rate=audio.sample_rate, global_step=step)
+
+                val_mel_loss = 0
+                for i, val_mel in enumerate(val_mel_dataloader):
+                    val_mel_pred = data_mel['mel_post'].to(device)
+                    with torch.no_grad():
+                        wav_pred_fake = g_model(mel_pred)
+                        mel_fake = mel_spectrogram(wav_pred_fake.squeeze(1), n_fft=1024, num_mels=80, sampling_rate=22050, hop_size=256,
+                                                   win_size=1024, fmin=0, fmax=8000)
+                        #mel_pred_loss = 10000. * F.mse_loss(torch.exp(mel_fake), torch.exp(mel_pred))
+                        mel_pred_loss = 1000. * torch.norm(torch.exp(mel_fake) - torch.exp(mel_pred), p="fro") / torch.norm(torch.exp(mel_pred), p="fro")
+                        val_mel_loss += mel_pred_loss
+
+                summary_writer.add_scalar('generator_mel_pred_loss_val', val_mel_loss / len(val_mel_dataloader), global_step=step)
+
+
 
                 g_model.train()
                 summary_writer.add_audio('generated', wav_fake, sample_rate=audio.sample_rate, global_step=step)
