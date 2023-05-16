@@ -90,12 +90,12 @@ class MelDataset(Dataset):
     def __getitem__(self, item_id: int) -> Dict[str, torch.Tensor]:
         file_id = self.file_ids[item_id]
         mel_path = self.data_path / f'{file_id}.pt'
-        pred = torch.load(mel_path)
+        pred = torch.load(mel_path, map_location=torch.device('cpu'))
         mel = pred['mel_post'].squeeze()
         if self.segment_len is not None:
             mel_pad_len = 2 * self.mel_segment_len - mel.size(-1)
             if mel_pad_len > 0:
-                mel_pad = torch.full((mel.size(0), mel_pad_len), fill_value=self.padding_val).to(mel.device)
+                mel_pad = torch.full((mel.size(0), mel_pad_len), fill_value=self.padding_val)
                 mel = torch.cat([mel, mel_pad], dim=-1)
             max_mel_start = mel.size(-1) - self.mel_segment_len
             mel_start = random.randint(0, max_mel_start)
