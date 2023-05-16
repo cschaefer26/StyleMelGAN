@@ -3,7 +3,7 @@ model_name: 'welt_predtuning'
 
 paths:
   train_dir: '/Users/cschaefe/datasets/stylemelgan_welt_train'
-  train_dir_mels: '/Users/cschaefe/datasets/welt_mels_predicted'
+  train_dir_mels: '/Users/cschaefe/datasets/finetuning/bild_welt_masked_mels'
   val_dir: '/Users/cschaefe/datasets/stylemelgan_welt_fuckup'
   checkpoints: 'stylemelgan/checkpoints'
 

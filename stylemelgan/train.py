@@ -121,23 +121,24 @@ if __name__ == '__main__':
                     for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
                         g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
-            factor = 1. if step < pretraining_steps else 0.
 
-            stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
-            g_loss_all = g_loss + factor * (stft_norm_loss + stft_spec_loss)
-
-            g_optim.zero_grad()
-            g_loss_all.backward()
-            g_optim.step()
-
-            mel_pred = data_mel['mel'].to(device)
+            mel_pred = data_mel['mel_post'].to(device)
 
             wav_pred_fake = g_model(mel_pred)
             mel_fake = mel_spectrogram(wav_pred_fake.squeeze(1), n_fft=1024, num_mels=80, sampling_rate=22050, hop_size=256,
                                        win_size=1024, fmin=0, fmax=8000)
-            mel_pred_loss = 10000. * F.mse_loss(torch.exp(mel_fake), torch.exp(mel_pred))
+            #mel_pred_loss = 10000. * F.mse_loss(torch.exp(mel_fake), torch.exp(mel_pred))
+            mel_pred_loss = 100. * torch.norm(torch.exp(mel_fake) - torch.exp(mel_pred), p="fro") / torch.norm(torch.exp(mel_pred), p="fro")
+
+            print(mel_pred_loss)
+
+            factor = 1. if step < pretraining_steps else 0.
+
+            stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
+            g_loss_all = g_loss + mel_pred_loss + factor * (stft_norm_loss + stft_spec_loss)
+
             g_optim.zero_grad()
-            mel_pred_loss.backward()
+            g_loss_all.backward()
             g_optim.step()
 
             pbar.set_description(desc=f'Epoch: {epoch} | Step {step} '
@@ -182,8 +183,8 @@ if __name__ == '__main__':
                     best_stft = val_norm_loss + val_spec_loss
                     print(f'\nnew best stft: {best_stft}')
                     torch.save({
-                        'g_model_g': g_model.state_dict(),
-                        'g_optim_g': g_optim.state_dict(),
+                        'model_g': g_model.state_dict(),
+                        'optim_g': g_optim.state_dict(),
                         'model_d': d_model.state_dict(),
                         'optim_d': d_optim.state_dict(),
                         'config': config,
