@@ -176,7 +176,7 @@ def new_dataloader(data_path: Path,
 
     dataset = AudioDataset(data_path=data_path, segment_len=segment_len, hop_len=hop_len, sample_rate=sample_rate)
     dataloader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True,
-                            num_workers=num_workers, pin_memory=True, drop_last=True)
+                            num_workers=num_workers, pin_memory=False, drop_last=True)
     return dataloader
 
 
