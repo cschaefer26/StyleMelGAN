@@ -75,13 +75,13 @@ if __name__ == '__main__':
                                 num_workers=train_cfg['num_workers'], sample_rate=audio.sample_rate)
 
     mel_files = list(train_pred_data_path.glob('**/*.pt'))
-    val_mel_files = mel_files[:2]
-    train_mel_files = mel_files[2:]
+    val_mel_files = mel_files[:32]
+    train_mel_files = mel_files[32:]
     train_mel_dataloader = new_mel_dataloader(files=train_mel_files, segment_len=train_cfg['segment_len'],
                                         hop_len=audio.hop_length, batch_size=train_cfg['batch_size'],
                                         num_workers=train_cfg['num_workers'])
-    val_mel_dataloader = new_mel_dataloader(files=val_mel_files, segment_len=train_cfg['segment_len'],
-                                        hop_len=audio.hop_length, batch_size=train_cfg['batch_size'],
+    val_mel_dataloader = new_mel_dataloader(files=val_mel_files, segment_len=None,
+                                        hop_len=audio.hop_length, batch_size=1,
                                         num_workers=train_cfg['num_workers'])
 
     val_dataset = AudioDataset(data_path=val_data_path, segment_len=None, hop_len=audio.hop_length,
@@ -200,15 +200,23 @@ if __name__ == '__main__':
                     summary_writer.add_audio('best_generated', wav_fake, sample_rate=audio.sample_rate, global_step=step)
 
                 val_mel_loss = 0
-                for i, val_mel in enumerate(val_mel_dataloader):
-                    val_mel_pred = data_mel['mel_post'].to(device)
+                worst, best = (-9999, None), (9999, None)
+                for i, val_mel in tqdm.tqdm(enumerate(val_mel_dataloader), total=len(val_mel_dataloader)):
+                    val_mel_pred = val_mel['mel_post'].to(device)
                     with torch.no_grad():
-                        wav_pred_fake = g_model(mel_pred)
+                        wav_pred_fake = g_model(val_mel_pred)
                         mel_fake = mel_spectrogram(wav_pred_fake.squeeze(1), n_fft=1024, num_mels=80, sampling_rate=22050, hop_size=256,
                                                    win_size=1024, fmin=0, fmax=8000)
                         #mel_pred_loss = 10000. * F.mse_loss(torch.exp(mel_fake), torch.exp(mel_pred))
-                        mel_pred_loss = 1000. * torch.norm(torch.exp(mel_fake) - torch.exp(mel_pred), p="fro") / torch.norm(torch.exp(mel_pred), p="fro")
+                        mel_pred_loss = 1000. * torch.norm(torch.exp(mel_fake) - torch.exp(val_mel_pred), p="fro") / torch.norm(torch.exp(val_mel_pred), p="fro")
+                        if mel_pred_loss > worst[0]:
+                            worst = (mel_pred_loss, wav_pred_fake)
+                        if mel_pred_loss < best[0]:
+                            best = (mel_pred_loss, wav_pred_fake)
                         val_mel_loss += mel_pred_loss
+
+                summary_writer.add_audio('best_exp_generated', best[1].squeeze(), sample_rate=audio.sample_rate, global_step=step)
+                summary_writer.add_audio('worst_exp_generated', worst[1].squeeze(), sample_rate=audio.sample_rate, global_step=step)
 
                 summary_writer.add_scalar('generator_mel_pred_loss_val', val_mel_loss / len(val_mel_dataloader), global_step=step)
                 if val_mel_loss < best_exp:
