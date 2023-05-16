@@ -219,7 +219,7 @@ if __name__ == '__main__':
                 summary_writer.add_audio('worst_exp_generated', worst[1].squeeze(), sample_rate=audio.sample_rate, global_step=step)
 
                 summary_writer.add_scalar('generator_mel_pred_loss_val', val_mel_loss / len(val_mel_dataloader), global_step=step)
-                if val_mel_loss < best_exp:
+                if val_mel_loss / len(val_mel_dataloader) < best_exp:
                     best_exp = val_mel_loss
                     print(f'\nnew best val exp loss: {best_stft}')
                     torch.save({
@@ -227,9 +227,6 @@ if __name__ == '__main__':
                         'config': config,
                         'step': step
                     }, f'checkpoints/best_model_exp_{best_exp:#.2}_{model_name}.pt')
-                    summary_writer.add_audio('best_generated', wav_fake, sample_rate=audio.sample_rate, global_step=step)
-
-
 
                 g_model.train()
                 summary_writer.add_audio('generated', wav_fake, sample_rate=audio.sample_rate, global_step=step)
