@@ -74,7 +74,7 @@ class MelDataset(Dataset):
                  segment_len: Union[int, None],
                  padding_val: float = -11.5129) -> None:
         mel_names = set(files)
-        self.data_path = data_path
+        self.files = files
         self.hop_len = hop_len
         self.segment_len = segment_len
         self.padding_val = padding_val
@@ -86,8 +86,7 @@ class MelDataset(Dataset):
         return len(self.file_ids)
 
     def __getitem__(self, item_id: int) -> Dict[str, torch.Tensor]:
-        file_id = self.file_ids[item_id]
-        mel_path = self.data_path / f'{file_id}.pt'
+        mel_path = self.files[item_id]
         pred = torch.load(mel_path, map_location=torch.device('cpu'))
         mel = pred['mel_post'].squeeze()
         if self.segment_len is not None:
