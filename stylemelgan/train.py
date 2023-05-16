@@ -94,6 +94,7 @@ if __name__ == '__main__':
     summary_writer = SummaryWriter(log_dir=f'checkpoints/logs_{model_name}')
 
     best_stft = 9999
+    best_exp = 9999
 
     for epoch in range(train_cfg['epochs']):
         pbar = tqdm.tqdm(enumerate(zip(dataloader, train_mel_dataloader), 1), total=len(dataloader))
@@ -210,6 +211,15 @@ if __name__ == '__main__':
                         val_mel_loss += mel_pred_loss
 
                 summary_writer.add_scalar('generator_mel_pred_loss_val', val_mel_loss / len(val_mel_dataloader), global_step=step)
+                if val_mel_loss < best_exp:
+                    best_exp = val_mel_loss
+                    print(f'\nnew best val exp loss: {best_stft}')
+                    torch.save({
+                        'model_g': g_model.state_dict(),
+                        'config': config,
+                        'step': step
+                    }, f'checkpoints/best_model_exp_{best_exp:#.2}_{model_name}.pt')
+                    summary_writer.add_audio('best_generated', wav_fake, sample_rate=audio.sample_rate, global_step=step)
 
 
 
