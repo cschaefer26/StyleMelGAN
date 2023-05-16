@@ -215,11 +215,12 @@ if __name__ == '__main__':
                             best = (mel_pred_loss, wav_pred_fake)
                         val_mel_loss += mel_pred_loss
 
+                val_mel_loss /= len(val_mel_dataloader)
                 summary_writer.add_audio('best_exp_generated', best[1].squeeze(), sample_rate=audio.sample_rate, global_step=step)
                 summary_writer.add_audio('worst_exp_generated', worst[1].squeeze(), sample_rate=audio.sample_rate, global_step=step)
 
-                summary_writer.add_scalar('generator_mel_pred_loss_val', val_mel_loss / len(val_mel_dataloader), global_step=step)
-                if val_mel_loss / len(val_mel_dataloader) < best_exp:
+                summary_writer.add_scalar('generator_mel_pred_loss_val', val_mel_loss, global_step=step)
+                if val_mel_loss < best_exp:
                     best_exp = val_mel_loss
                     print(f'\nnew best val exp loss: {best_stft}')
                     torch.save({
