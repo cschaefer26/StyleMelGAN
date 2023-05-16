@@ -95,7 +95,7 @@ class MelDataset(Dataset):
         if self.segment_len is not None:
             mel_pad_len = 2 * self.mel_segment_len - mel.size(-1)
             if mel_pad_len > 0:
-                mel_pad = torch.full((mel.size(0), mel_pad_len), fill_value=self.padding_val)
+                mel_pad = torch.full((mel.size(0), mel_pad_len), fill_value=self.padding_val).to(mel.device)
                 mel = torch.cat([mel, mel_pad], dim=-1)
             max_mel_start = mel.size(-1) - self.mel_segment_len
             mel_start = random.randint(0, max_mel_start)
