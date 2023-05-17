@@ -217,7 +217,7 @@ if __name__ == '__main__':
                         diff = (torch.exp(mel_fake) - torch.exp(val_mel_pred)) ** 2
                         diff = diff.mean(1)
                         diff[diff < 0.005] = 0
-                        mel_pred_loss = 100. * diff.sum()
+                        mel_pred_loss = 100. * diff.mean()
 
                         if mel_pred_loss > worst[0]:
                             worst = (mel_pred_loss, wav_pred_fake)
