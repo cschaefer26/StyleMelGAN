@@ -143,8 +143,8 @@ if __name__ == '__main__':
 
             mel_pred_loss_avg = 0
 
-            for b in range(mel_pred.size(0)):
-                wav_pred_fake = g_model(mel_pred[b:b+1, :, :])
+            for b in range(mel_pred.size(0)//8):
+                wav_pred_fake = g_model(mel_pred[b*8:b*8+8, :, :])
                 mel_fake = mel_spectrogram(wav_pred_fake.squeeze(1), n_fft=1024, num_mels=80, sampling_rate=22050, hop_size=256,
                                            win_size=1024, fmin=0, fmax=8000)
                 diff = (torch.exp(mel_fake) - torch.exp(mel_pred[b, :, :])) ** 2
