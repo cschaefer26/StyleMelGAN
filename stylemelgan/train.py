@@ -132,6 +132,15 @@ if __name__ == '__main__':
             mel_pred = data_mel['mel_post'].to(device)
 
             g_optim.zero_grad()
+
+
+            factor = 1. if step < pretraining_steps else 0.
+
+            stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
+            g_loss_all = g_loss + factor * (stft_norm_loss + stft_spec_loss)
+
+            g_loss_all.backward()
+
             for b in range(mel_pred.size(0)):
                 wav_pred_fake = g_model(mel_pred[b:b+1, :, :])
                 mel_fake = mel_spectrogram(wav_pred_fake.squeeze(1), n_fft=1024, num_mels=80, sampling_rate=22050, hop_size=256,
@@ -143,13 +152,6 @@ if __name__ == '__main__':
                 mel_pred_loss.backward()
 
             print(mel_pred_loss)
-
-            factor = 1. if step < pretraining_steps else 0.
-
-            stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
-            g_loss_all = g_loss + factor * (stft_norm_loss + stft_spec_loss)
-
-            g_loss_all.backward()
             g_optim.step()
 
             pbar.set_description(desc=f'Epoch: {epoch} | Step {step} '
