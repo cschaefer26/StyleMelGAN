@@ -17,7 +17,7 @@ audio:
   fmax: 8000
 
 training:
-  batch_size: 8
+  batch_size: 2
   batch_size_mel: 16
   pretraining_steps: 200000
   segment_len: 16384
