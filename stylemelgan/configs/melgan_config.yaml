@@ -20,7 +20,8 @@ training:
   batch_size: 2
   batch_size_mel: 16
   pretraining_steps: 200000
-  segment_len: 16384
+  segment_len: 8192
+  segment_len_mel: 8192
   g_lr: 0.0001
   d_lr: 0.0001
   eval_steps: 100

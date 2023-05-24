@@ -165,7 +165,7 @@ if __name__ == '__main__':
                                       f'| stft_spec_loss {stft_spec_loss:#.4} ', refresh=True)
 
             summary_writer.add_scalar('generator_loss', g_loss, global_step=step)
-            summary_writer.add_scalar('generator_mel_pred_loss', mel_pred_loss, global_step=step)
+            summary_writer.add_scalar('generator_mel_pred_loss', mel_pred_loss_avg, global_step=step)
             summary_writer.add_scalar('stft_norm_loss', stft_norm_loss, global_step=step)
             summary_writer.add_scalar('stft_spec_loss', stft_spec_loss, global_step=step)
             summary_writer.add_scalar('discriminator_loss', d_loss, global_step=step)
