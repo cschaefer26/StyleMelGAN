@@ -150,7 +150,7 @@ if __name__ == '__main__':
                 diff = (torch.exp(mel_fake) - torch.exp(mel_pred[b, :, :])) ** 2
                 diff = diff.mean(1)
                 diff[diff < 0.005] = 0
-                mel_pred_loss = 10. * diff.sum()
+                mel_pred_loss = diff.sum()
                 mel_pred_loss_avg += mel_pred_loss.item()
                 mel_pred_loss.backward()
 
