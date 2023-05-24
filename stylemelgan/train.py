@@ -77,8 +77,8 @@ if __name__ == '__main__':
     mel_files = list(train_pred_data_path.glob('**/*.pt'))
     val_mel_files = mel_files[:512]
     train_mel_files = mel_files[512:]
-    train_mel_dataloader = new_mel_dataloader(files=train_mel_files, segment_len=train_cfg['segment_len_mel'],
-                                        hop_len=audio.hop_length, batch_size=train_cfg['batch_size_mel'],
+    train_mel_dataloader = new_mel_dataloader(files=train_mel_files, segment_len=train_cfg['segment_len'],
+                                        hop_len=audio.hop_length, batch_size=train_cfg['batch_size'],
                                         num_workers=train_cfg['num_workers'])
     val_mel_dataloader = new_mel_dataloader(files=val_mel_files, segment_len=None,
                                         hop_len=audio.hop_length, batch_size=1,
@@ -131,41 +131,37 @@ if __name__ == '__main__':
 
             mel_pred = data_mel['mel_post'].to(device)
 
-            g_optim.zero_grad()
+            wav_pred_fake = g_model(mel_pred)
+            mel_fake = mel_spectrogram(wav_pred_fake.squeeze(1), n_fft=1024, num_mels=80, sampling_rate=22050, hop_size=256,
+                                       win_size=1024, fmin=0, fmax=8000)
+            #mel_pred_loss = 10000. * F.mse_loss(torch.exp(mel_fake), torch.exp(mel_pred))
+            #mel_pred_loss = 1000. * torch.norm(torch.exp(mel_fake) - torch.exp(mel_pred), p="fro") / torch.norm(torch.exp(mel_pred), p="fro")
+            diff = (torch.exp(mel_fake) - torch.exp(mel_pred)) ** 2
+            diff = diff.mean(1)
+            diff[diff < 0.005] = 0
+            mel_pred_loss = 100. * diff.sum()
 
+
+            print(mel_pred_loss)
 
             factor = 1. if step < pretraining_steps else 0.
 
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
-            g_loss_all = g_loss + factor * (stft_norm_loss + stft_spec_loss)
+            g_loss_all = g_loss + mel_pred_loss + factor * (stft_norm_loss + stft_spec_loss)
 
+            g_optim.zero_grad()
             g_loss_all.backward()
-
-            mel_pred_loss_avg = 0
-
-            for b in range(mel_pred.size(0)//8):
-                wav_pred_fake = g_model(mel_pred[b*8:b*8+8, :, :])
-                mel_fake = mel_spectrogram(wav_pred_fake.squeeze(1), n_fft=1024, num_mels=80, sampling_rate=22050, hop_size=256,
-                                           win_size=1024, fmin=0, fmax=8000)
-                diff = (torch.exp(mel_fake) - torch.exp(mel_pred[b, :, :])) ** 2
-                diff = diff.mean(1)
-                diff[diff < 0.005] = 0
-                mel_pred_loss = diff.sum()
-                mel_pred_loss_avg += mel_pred_loss.item()
-                mel_pred_loss.backward()
-
-            print(mel_pred_loss_avg)
             g_optim.step()
 
             pbar.set_description(desc=f'Epoch: {epoch} | Step {step} '
                                       f'| g_loss: {g_loss:#.4} '
                                       f'| d_loss: {d_loss:#.4} '
                                       f'| stft_norm_loss {stft_norm_loss:#.4} '
-                                      f'| mel_pred_loss {mel_pred_loss_avg:#.4} '
+                                      f'| mel_pred_loss {mel_pred_loss:#.4} '
                                       f'| stft_spec_loss {stft_spec_loss:#.4} ', refresh=True)
 
             summary_writer.add_scalar('generator_loss', g_loss, global_step=step)
-            summary_writer.add_scalar('generator_mel_pred_loss', mel_pred_loss_avg, global_step=step)
+            summary_writer.add_scalar('generator_mel_pred_loss', mel_pred_loss, global_step=step)
             summary_writer.add_scalar('stft_norm_loss', stft_norm_loss, global_step=step)
             summary_writer.add_scalar('stft_spec_loss', stft_spec_loss, global_step=step)
             summary_writer.add_scalar('discriminator_loss', d_loss, global_step=step)
