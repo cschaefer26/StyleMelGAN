@@ -77,7 +77,7 @@ if __name__ == '__main__':
     mel_files = list(train_pred_data_path.glob('**/*.pt'))
     val_mel_files = mel_files[:512]
     train_mel_files = mel_files[512:]
-    train_mel_dataloader = new_mel_dataloader(files=train_mel_files, segment_len=train_cfg['segment_len'],
+    train_mel_dataloader = new_mel_dataloader(files=train_mel_files, segment_len=train_cfg['segment_len_mel'],
                                         hop_len=audio.hop_length, batch_size=train_cfg['batch_size_mel'],
                                         num_workers=train_cfg['num_workers'])
     val_mel_dataloader = new_mel_dataloader(files=val_mel_files, segment_len=None,
@@ -161,7 +161,7 @@ if __name__ == '__main__':
                                       f'| g_loss: {g_loss:#.4} '
                                       f'| d_loss: {d_loss:#.4} '
                                       f'| stft_norm_loss {stft_norm_loss:#.4} '
-                                      f'| mel_pred_loss {mel_pred_los_avgs:#.4} '
+                                      f'| mel_pred_loss {mel_pred_loss_avg:#.4} '
                                       f'| stft_spec_loss {stft_spec_loss:#.4} ', refresh=True)
 
             summary_writer.add_scalar('generator_loss', g_loss, global_step=step)
