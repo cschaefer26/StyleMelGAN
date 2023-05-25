@@ -15,6 +15,7 @@ from stylemelgan.discriminator import MultiScaleDiscriminator
 from stylemelgan.generator.melgan import Generator
 from stylemelgan.losses import stft, MultiResStftLoss
 from stylemelgan.utils import read_config
+from stylemelgan.losses import stft, MultiResStftLoss, TorchSTFT
 
 mpl.use('agg')  # Use non-interactive backend by default
 import numpy as np
@@ -89,6 +90,9 @@ if __name__ == '__main__':
 
     stft = partial(stft, n_fft=1024, hop_length=256, win_length=1024)
 
+    torch_stft = TorchSTFT(filter_length=16, hop_length=4, win_length=16).to(device)
+
+
     pretraining_steps = train_cfg['pretraining_steps']
 
     summary_writer = SummaryWriter(log_dir=f'checkpoints/logs_{model_name}')
@@ -103,7 +107,11 @@ if __name__ == '__main__':
             mel = data['mel'].to(device)
             wav_real = data['wav'].to(device)
 
-            wav_fake = g_model(mel)[:, :, :train_cfg['segment_len']]
+            spec, phase = g_model(mel)
+            #wav_fake = g_model(mel)[:, :, :train_cfg['segment_len']]
+            wav_fake = torch_stft.inverse(spec, phase)
+
+            #print(wav_fake.size())
 
             d_loss = 0.0
             g_loss = 0.0
@@ -134,8 +142,6 @@ if __name__ == '__main__':
             wav_pred_fake = g_model(mel_pred)
             mel_fake = mel_spectrogram(wav_pred_fake.squeeze(1), n_fft=1024, num_mels=80, sampling_rate=22050, hop_size=256,
                                        win_size=1024, fmin=0, fmax=8000)
-            #mel_pred_loss = 10000. * F.mse_loss(torch.exp(mel_fake), torch.exp(mel_pred))
-            #mel_pred_loss = 1000. * torch.norm(torch.exp(mel_fake) - torch.exp(mel_pred), p="fro") / torch.norm(torch.exp(mel_pred), p="fro")
             diff = (torch.exp(mel_fake) - torch.exp(mel_pred)) ** 2
             diff = diff.mean(1)
             diff[diff < 0.005] = 0
@@ -175,7 +181,9 @@ if __name__ == '__main__':
                 for i, val_data in enumerate(val_dataset):
                     val_mel = val_data['mel'].to(device)
                     val_mel = val_mel.unsqueeze(0)
-                    wav_fake = g_model.inference(val_mel).squeeze().cpu().numpy()
+                    s, p = g_model.inference(val_mel)
+                    wav_fake = torch_stft.inverse(s, p)
+                    wav_fake = wav_fake.squeeze().cpu().numpy()
                     wav_real = val_data['wav'].detach().squeeze().cpu().numpy()
                     wav_f = torch.tensor(wav_fake).unsqueeze(0).to(device)
                     wav_r = torch.tensor(wav_real).unsqueeze(0).to(device)
