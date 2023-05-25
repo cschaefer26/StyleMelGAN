@@ -18,7 +18,7 @@ audio:
 
 training:
   batch_size: 2
-  batch_size_mel: 16
+  batch_size_mel: 2
   pretraining_steps: 200000
   segment_len: 8192
   segment_len_mel: 8192

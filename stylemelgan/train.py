@@ -75,8 +75,8 @@ if __name__ == '__main__':
                                 num_workers=train_cfg['num_workers'], sample_rate=audio.sample_rate)
 
     mel_files = list(train_pred_data_path.glob('**/*.pt'))
-    val_mel_files = mel_files[:512]
-    train_mel_files = mel_files[512:]
+    val_mel_files = mel_files[:2]
+    train_mel_files = mel_files[2:]
     train_mel_dataloader = new_mel_dataloader(files=train_mel_files, segment_len=train_cfg['segment_len'],
                                         hop_len=audio.hop_length, batch_size=train_cfg['batch_size'],
                                         num_workers=train_cfg['num_workers'])
