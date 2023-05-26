@@ -10,7 +10,7 @@ from torch.cuda import is_available
 from torch.utils.tensorboard import SummaryWriter
 
 from stylemelgan.audio import Audio
-from stylemelgan.dataset import new_dataloader, AudioDataset, new_mel_dataloader
+from stylemelgan.dataset import new_dataloader, AudioDataset, mel_spectrogram, new_mel_dataloader
 from stylemelgan.discriminator import MultiScaleDiscriminator
 from stylemelgan.generator.melgan import Generator
 from stylemelgan.losses import stft, MultiResStftLoss, TorchSTFT
