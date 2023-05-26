@@ -1,6 +1,8 @@
 import random
 from pathlib import Path
 from typing import Dict, Union
+
+import tqdm
 from librosa.filters import mel as librosa_mel_fn
 import librosa
 import torch
@@ -73,7 +75,13 @@ class MelDataset(Dataset):
                  hop_len: int,
                  segment_len: Union[int, None],
                  padding_val: float = -11.5129) -> None:
-        mel_names = set(files)
+        mel_names = set()
+        for f in tqdm.tqdm(files, total=len(files)):
+            try:
+                torch.load(f)
+                mel_names.add(f)
+            except:
+                print(f'torch error for file: {f}')
         self.files = files
         self.hop_len = hop_len
         self.segment_len = segment_len
@@ -119,7 +127,7 @@ class AudioDataset(Dataset):
         self.sample_rate = sample_rate
         self.file_ids = [n.stem for n in mel_names]
         if segment_len is not None:
-            self.mel_segment_len = segment_len // hop_len + 2
+            self.mel_segment_len = segment_len // hop_len
 
     def __len__(self):
         return len(self.file_ids)
