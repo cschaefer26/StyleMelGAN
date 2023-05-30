@@ -146,7 +146,7 @@ if __name__ == '__main__':
 
             _, p_out = p_model(wav_pred_fake)
             p_loss = (p_out - diff) ** 2
-            p_loss = 100. * p_loss.mean()
+            p_loss = 1000. * p_loss.mean()
 
             p_optim.zero_grad()
             p_loss.backward()
@@ -156,7 +156,7 @@ if __name__ == '__main__':
 
             _, p_fake = p_model(wav_pred_fake)
             g_p_loss = p_fake ** 2
-            g_p_loss = 100. * g_p_loss.mean()
+            g_p_loss = 1000. * g_p_loss.mean()
 
             print(p_loss, g_p_loss)
 
@@ -276,6 +276,8 @@ if __name__ == '__main__':
             'optim_g': g_optim.state_dict(),
             'model_d': d_model.state_dict(),
             'optim_d': d_optim.state_dict(),
+            'model_p': p_model.state_dict(),
+            'optim_p': p_optim.state_dict(),
             'config': config,
             'step': step
         }, f'checkpoints/latest_model__{model_name}.pt')
