@@ -46,10 +46,10 @@ class ResBlock(nn.Module):
             nn.utils.remove_weight_norm(block[4])
 
 
-class ResStack(nn.Module):
+class ResStackHifi(nn.Module):
 
     def __init__(self, channel, kernel_sizes=(3, 7, 11), dilations=(1, 3, 5)):
-        super(ResStack, self).__init__()
+        super(ResStackHifi, self).__init__()
 
         self.blocks = nn.ModuleList([
             ResBlock(channel, dilations=dilations, kernel_size=kernel_sizes[i])
@@ -72,6 +72,38 @@ class ResStack(nn.Module):
             nn.utils.remove_weight_norm(shortcut)
 
 
+class ResStack(nn.Module):
+    def __init__(self, channel, num_layers=4):
+        super(ResStack, self).__init__()
+
+        self.blocks = nn.ModuleList([
+            nn.Sequential(
+                nn.LeakyReLU(0.2),
+                nn.ReflectionPad1d(3**i),
+                nn.utils.weight_norm(nn.Conv1d(channel, channel, kernel_size=3, dilation=3**i)),
+                nn.LeakyReLU(0.2),
+                nn.utils.weight_norm(nn.Conv1d(channel, channel, kernel_size=1)),
+            )
+            for i in range(num_layers)
+        ])
+
+        self.shortcuts = nn.ModuleList([
+            nn.utils.weight_norm(nn.Conv1d(channel, channel, kernel_size=1))
+            for i in range(num_layers)
+        ])
+
+    def forward(self, x):
+        for block, shortcut in zip(self.blocks, self.shortcuts):
+            x = shortcut(x) + block(x)
+        return x
+
+    def remove_weight_norm(self):
+        for block, shortcut in zip(self.blocks, self.shortcuts):
+            nn.utils.remove_weight_norm(block[2])
+            nn.utils.remove_weight_norm(block[4])
+            nn.utils.remove_weight_norm(shortcut)
+
+
 class Generator(nn.Module):
     def __init__(self, mel_channel):
         super(Generator, self).__init__()
@@ -84,27 +116,34 @@ class Generator(nn.Module):
             nn.LeakyReLU(0.2),
             nn.utils.weight_norm(nn.ConvTranspose1d(512, 256, kernel_size=16, stride=8, padding=4)),
 
-            ResStack(256, kernel_sizes=(3, 7, 11)),
+            ResStackHifi(256, kernel_sizes=(3, 7, 11)),
 
             nn.LeakyReLU(0.2),
             nn.utils.weight_norm(nn.ConvTranspose1d(256, 128, kernel_size=16, stride=8, padding=4)),
 
-            ResStack(128, kernel_sizes=(3, 7, 11)),
-            nn.LeakyReLU(0.2)
-        )
+            ResStackHifi(128, kernel_sizes=(3, 7, 11)),
 
-        self.post_n_fft = 16
-        self.conv_post = weight_norm(Conv1d(128, self.post_n_fft + 2, 7, 1, padding=3))
-        self.reflection_pad = torch.nn.ReflectionPad1d((1, 0))
+            nn.LeakyReLU(0.2),
+            nn.utils.weight_norm(nn.ConvTranspose1d(128, 64, kernel_size=4, stride=2, padding=1)),
+
+            ResStack(64, num_layers=8),
+
+            nn.LeakyReLU(0.2),
+            nn.utils.weight_norm(nn.ConvTranspose1d(64, 32, kernel_size=4, stride=2, padding=1)),
+
+            ResStack(32, num_layers=9),
+
+            nn.LeakyReLU(0.2),
+            nn.ReflectionPad1d(3),
+            nn.utils.weight_norm(nn.Conv1d(32, 1, kernel_size=7, stride=1)),
+            nn.Tanh(),
+
+        )
 
     def forward(self, mel):
         mel = (mel + 5.0) / 5.0 # roughly normalize spectrogram
         x = self.generator(mel)
-        x = self.reflection_pad(x)
-        x = self.conv_post(x)
-        spec = torch.exp(x[:, :self.post_n_fft // 2 + 1, :])
-        phase = torch.sin(x[:, self.post_n_fft // 2 + 1:, :])
-        return spec, phase
+        return x
 
     def eval(self, inference=False):
         super(Generator, self).eval()
@@ -150,10 +189,7 @@ if __name__ == '__main__':
     model = Generator(80)
     x = torch.randn(3, 80, 1000)
     start = time.time()
-    a, b = model(x)
-    print(a.size())
-    torch_stft = TorchSTFT(filter_length=128, hop_length=4, win_length=128)
-    y = torch_stft.inverse(a, b)
+    y  = model(x)
     print(y.size())
 
     dur = time.time() - start
