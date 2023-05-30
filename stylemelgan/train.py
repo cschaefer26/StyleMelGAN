@@ -6,12 +6,13 @@ import torch
 import torch.nn.functional as F
 import tqdm
 from matplotlib.figure import Figure
+from statsmodels.distributions.discrete import DiscretizedCount
 from torch.cuda import is_available
 from torch.utils.tensorboard import SummaryWriter
 
 from stylemelgan.audio import Audio
 from stylemelgan.dataset import new_dataloader, AudioDataset, mel_spectrogram, new_mel_dataloader
-from stylemelgan.discriminator import MultiScaleDiscriminator
+from stylemelgan.discriminator import MultiScaleDiscriminator, Discriminator
 from stylemelgan.generator.melgan import Generator
 from stylemelgan.losses import stft, MultiResStftLoss
 from stylemelgan.utils import read_config
@@ -48,12 +49,17 @@ if __name__ == '__main__':
 
     g_model = Generator(audio.n_mels).to(device)
     d_model = MultiScaleDiscriminator().to(device)
+    p_model = Discriminator().to(device)
+
     train_cfg = config['training']
     g_optim = torch.optim.Adam(g_model.parameters(), lr=train_cfg['g_lr'], betas=(0.5, 0.9))
     d_optim = torch.optim.Adam(d_model.parameters(), lr=train_cfg['d_lr'], betas=(0.5, 0.9))
+    p_optim = torch.optim.Adam(p_model.parameters(), lr=train_cfg['d_lr'], betas=(0.5, 0.9))
     for g in g_optim.param_groups:
         g['lr'] = train_cfg['g_lr']
     for g in d_optim.param_groups:
+        g['lr'] = train_cfg['d_lr']
+    for g in p_optim.param_groups:
         g['lr'] = train_cfg['d_lr']
     multires_stft_loss = MultiResStftLoss().to(device)
 
@@ -128,26 +134,36 @@ if __name__ == '__main__':
                     for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
                         g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
-
             mel_pred = data_mel['mel_post'].to(device)
+            wav_pred_fake = g_model(mel_pred)
+
+            with torch.no_grad():
+                mel_fake = mel_spectrogram(wav_pred_fake.squeeze(1), n_fft=1024, num_mels=80, sampling_rate=22050, hop_size=256,
+                                           win_size=1024, fmin=0, fmax=8000)
+                diff = (torch.exp(mel_fake) - torch.exp(mel_pred)) ** 2
+                diff = diff.mean(1) * 100.
+                print('max: ', diff.max())
+
+            _, p_out = p_model(wav_pred_fake)
+            p_loss = (p_out - diff) ** 2
+            p_loss = 100. * p_loss.mean()
+
+            p_optim.zero_grad()
+            p_loss.backward()
+            p_optim.step()
 
             wav_pred_fake = g_model(mel_pred)
-            mel_fake = mel_spectrogram(wav_pred_fake.squeeze(1), n_fft=1024, num_mels=80, sampling_rate=22050, hop_size=256,
-                                       win_size=1024, fmin=0, fmax=8000)
-            #mel_pred_loss = 10000. * F.mse_loss(torch.exp(mel_fake), torch.exp(mel_pred))
-            #mel_pred_loss = 1000. * torch.norm(torch.exp(mel_fake) - torch.exp(mel_pred), p="fro") / torch.norm(torch.exp(mel_pred), p="fro")
-            diff = (torch.exp(mel_fake) - torch.exp(mel_pred)) ** 2
-            diff = diff.mean(1)
-            diff[diff < 0.005] = 0
-            mel_pred_loss = 100. * diff.sum()
 
+            _, p_fake = p_model(wav_pred_fake)
+            g_p_loss = p_fake ** 2
+            g_p_loss = 100. * g_p_loss.mean()
 
-            print(mel_pred_loss)
+            print(p_loss, g_p_loss)
 
             factor = 1. if step < pretraining_steps else 0.
 
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
-            g_loss_all = g_loss + mel_pred_loss + factor * (stft_norm_loss + stft_spec_loss)
+            g_loss_all = g_loss + g_p_loss + factor * (stft_norm_loss + stft_spec_loss)
 
             g_optim.zero_grad()
             g_loss_all.backward()
@@ -156,12 +172,14 @@ if __name__ == '__main__':
             pbar.set_description(desc=f'Epoch: {epoch} | Step {step} '
                                       f'| g_loss: {g_loss:#.4} '
                                       f'| d_loss: {d_loss:#.4} '
+                                      f'| p_loss: {p_loss:#.4} '
+                                      f'| g_p_loss: {g_p_loss:#.4} '
                                       f'| stft_norm_loss {stft_norm_loss:#.4} '
-                                      f'| mel_pred_loss {mel_pred_loss:#.4} '
                                       f'| stft_spec_loss {stft_spec_loss:#.4} ', refresh=True)
 
             summary_writer.add_scalar('generator_loss', g_loss, global_step=step)
-            summary_writer.add_scalar('generator_mel_pred_loss', mel_pred_loss, global_step=step)
+            summary_writer.add_scalar('p_loss', p_loss, global_step=step)
+            summary_writer.add_scalar('g_p_loss', g_p_loss, global_step=step)
             summary_writer.add_scalar('stft_norm_loss', stft_norm_loss, global_step=step)
             summary_writer.add_scalar('stft_spec_loss', stft_spec_loss, global_step=step)
             summary_writer.add_scalar('discriminator_loss', d_loss, global_step=step)
