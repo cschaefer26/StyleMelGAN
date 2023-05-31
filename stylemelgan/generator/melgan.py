@@ -109,7 +109,7 @@ class Generator(nn.Module):
         super(Generator, self).__init__()
         self.mel_channel = mel_channel
 
-        self.generator = nn.Sequential(
+        self.generator_hifigan = nn.Sequential(
             nn.ReflectionPad1d(3),
             nn.utils.weight_norm(nn.Conv1d(mel_channel, 256, kernel_size=7, stride=1)),
 
@@ -122,8 +122,11 @@ class Generator(nn.Module):
             nn.utils.weight_norm(nn.ConvTranspose1d(128, 64, kernel_size=16, stride=8, padding=4)),
 
             ResStackHifi(64, kernel_sizes=(3, 7, 11)),
-
             nn.LeakyReLU(0.2),
+        )
+
+        self.generator_melgan = Sequential(
+
             nn.utils.weight_norm(nn.ConvTranspose1d(64, 32, kernel_size=4, stride=2, padding=1)),
 
             ResStack(32, num_layers=8),
@@ -140,10 +143,21 @@ class Generator(nn.Module):
 
         )
 
+        self.post_n_fft = 16
+        self.conv_post = weight_norm(Conv1d(64, self.post_n_fft + 2, 7, 1, padding=3))
+        self.reflection_pad = torch.nn.ReflectionPad1d((1, 0))
+
     def forward(self, mel):
         mel = (mel + 5.0) / 5.0 # roughly normalize spectrogram
-        x = self.generator(mel)
-        return x
+        x = self.generator_hifigan(mel)
+        y = self.generator_melgan(x)
+
+        x = self.reflection_pad(x)
+        x = self.conv_post(x)
+        spec = torch.exp(x[:, :self.post_n_fft // 2 + 1, :])
+        phase = torch.sin(x[:, self.post_n_fft // 2 + 1:, :])
+
+        return spec, phase, y
 
     def eval(self, inference=False):
         super(Generator, self).eval()
@@ -162,12 +176,12 @@ class Generator(nn.Module):
 
     def inference(self,
                   mel: torch.Tensor,
-                  pad_steps: int = 10) -> torch.Tensor:
+                  pad_steps: int = 10) -> tuple:
         with torch.no_grad():
             pad = torch.full((1, 80, pad_steps), -11.5129).to(mel.device)
             mel = torch.cat((mel, pad), dim=2)
-            spec, phase = self.forward(mel)
-        return spec, phase
+            spec, phase, y = self.forward(mel)
+        return spec, phase, y
 
     @classmethod
     def from_config(cls, config: Dict[str, Any]) -> 'Generator':
