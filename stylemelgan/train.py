@@ -180,7 +180,7 @@ if __name__ == '__main__':
                 for i, val_data in enumerate(val_dataset):
                     val_mel = val_data['mel'].to(device)
                     val_mel = val_mel.unsqueeze(0)
-                    s, p = g_model(val_mel)
+                    s, p = g_model.inference(val_mel)
                     wav_fake = torch_stft.inverse(s, p)
                     wav_fake = wav_fake.squeeze().cpu().numpy()
                     wav_real = val_data['wav'].detach().squeeze().cpu().numpy()
@@ -216,7 +216,7 @@ if __name__ == '__main__':
                 for i, val_mel in tqdm.tqdm(enumerate(val_mel_dataloader), total=len(val_mel_dataloader)):
                     val_mel_pred = val_mel['mel_post'].to(device)
                     with torch.no_grad():
-                        s, p = g_model.inference(val_mel)
+                        s, p = g_model(val_mel)
                         wav_pred_fake = torch_stft.inverse(s, p)
                         mel_fake = mel_spectrogram(wav_pred_fake.squeeze(1), n_fft=1024, num_mels=80, sampling_rate=22050, hop_size=256,
                                                    win_size=1024, fmin=0, fmax=8000)
