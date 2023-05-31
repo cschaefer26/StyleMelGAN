@@ -149,6 +149,7 @@ if __name__ == '__main__':
                     val_mel = val_data['mel'].to(device)
                     val_mel = val_mel.unsqueeze(0)
                     s, p, wav_fake = g_model.inference(val_mel)
+                    wav_fake = wav_fake.squeeze().cpu().numpy()
                     wav_real = val_data['wav'].detach().squeeze().cpu().numpy()
                     wav_f = torch.tensor(wav_fake).unsqueeze(0).to(device)
                     wav_r = torch.tensor(wav_real).unsqueeze(0).to(device)
