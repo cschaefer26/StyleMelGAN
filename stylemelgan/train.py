@@ -10,10 +10,10 @@ from torch.cuda import is_available
 from torch.utils.tensorboard import SummaryWriter
 
 from stylemelgan.audio import Audio
-from stylemelgan.dataset import new_dataloader, AudioDataset, mel_spectrogram, new_mel_dataloader
+from stylemelgan.dataset import new_dataloader, AudioDataset, new_mel_dataloader, mel_spectrogram
 from stylemelgan.discriminator import MultiScaleDiscriminator
 from stylemelgan.generator.melgan import Generator
-from stylemelgan.losses import stft, MultiResStftLoss
+from stylemelgan.losses import stft, MultiResStftLoss, TorchSTFT
 from stylemelgan.utils import read_config
 
 mpl.use('agg')  # Use non-interactive backend by default
@@ -67,7 +67,7 @@ if __name__ == '__main__':
         print(f'Loaded model with step {step}')
     except Exception as e:
         print(e)
-        raise ValueError(e)
+        #raise ValueError(e)
 
     train_cfg = config['training']
     dataloader = new_dataloader(data_path=train_data_path, segment_len=train_cfg['segment_len'],
@@ -89,6 +89,9 @@ if __name__ == '__main__':
 
     stft = partial(stft, n_fft=1024, hop_length=256, win_length=1024)
 
+    torch_stft = TorchSTFT(filter_length=16, hop_length=4, win_length=16).to(device)
+
+
     pretraining_steps = train_cfg['pretraining_steps']
 
     summary_writer = SummaryWriter(log_dir=f'checkpoints/logs_{model_name}')
@@ -103,7 +106,11 @@ if __name__ == '__main__':
             mel = data['mel'].to(device)
             wav_real = data['wav'].to(device)
 
-            wav_fake = g_model(mel)[:, :, :train_cfg['segment_len']]
+            spec, phase = g_model(mel)
+            #wav_fake = g_model(mel)[:, :, :train_cfg['segment_len']]
+            wav_fake = torch_stft.inverse(spec, phase)
+
+            #print(wav_fake.size())
 
             d_loss = 0.0
             g_loss = 0.0
@@ -131,7 +138,8 @@ if __name__ == '__main__':
 
             mel_pred = data_mel['mel_post'].to(device)
 
-            wav_pred_fake = g_model(mel_pred)
+            s, p = g_model(mel_pred)
+            wav_pred_fake = torch_stft.inverse(s, p)
             mel_fake = mel_spectrogram(wav_pred_fake.squeeze(1), n_fft=1024, num_mels=80, sampling_rate=22050, hop_size=256,
                                        win_size=1024, fmin=0, fmax=8000)
             #mel_pred_loss = 10000. * F.mse_loss(torch.exp(mel_fake), torch.exp(mel_pred))
@@ -172,7 +180,9 @@ if __name__ == '__main__':
                 for i, val_data in enumerate(val_dataset):
                     val_mel = val_data['mel'].to(device)
                     val_mel = val_mel.unsqueeze(0)
-                    wav_fake = g_model.inference(val_mel).squeeze().cpu().numpy()
+                    s, p = g_model.inference(val_mel)
+                    wav_fake = torch_stft.inverse(s, p)
+                    wav_fake = wav_fake.squeeze().cpu().numpy()
                     wav_real = val_data['wav'].detach().squeeze().cpu().numpy()
                     wav_f = torch.tensor(wav_fake).unsqueeze(0).to(device)
                     wav_r = torch.tensor(wav_real).unsqueeze(0).to(device)
@@ -206,7 +216,8 @@ if __name__ == '__main__':
                 for i, val_mel in tqdm.tqdm(enumerate(val_mel_dataloader), total=len(val_mel_dataloader)):
                     val_mel_pred = val_mel['mel_post'].to(device)
                     with torch.no_grad():
-                        wav_pred_fake = g_model(val_mel_pred)
+                        s, p = g_model.inference(val_mel)
+                        wav_pred_fake = torch_stft.inverse(s, p)
                         mel_fake = mel_spectrogram(wav_pred_fake.squeeze(1), n_fft=1024, num_mels=80, sampling_rate=22050, hop_size=256,
                                                    win_size=1024, fmin=0, fmax=8000)
                         #mel_pred_loss = 10000. * F.mse_loss(torch.exp(mel_fake), torch.exp(mel_pred))
