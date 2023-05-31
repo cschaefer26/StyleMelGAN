@@ -136,13 +136,10 @@ if __name__ == '__main__':
                                        win_size=1024, fmin=0, fmax=8000)
             #mel_pred_loss = 10000. * F.mse_loss(torch.exp(mel_fake), torch.exp(mel_pred))
             #mel_pred_loss = 1000. * torch.norm(torch.exp(mel_fake) - torch.exp(mel_pred), p="fro") / torch.norm(torch.exp(mel_pred), p="fro")
+
             diff = (torch.exp(mel_fake) - torch.exp(mel_pred)) ** 2
-            diff = diff.mean(1)
-            diff[diff < 0.005] = 0
-            mel_pred_loss = 100. * diff.sum()
 
-
-            print(mel_pred_loss)
+            mel_pred_loss = 100. * torch.norm(torch.exp(mel_fake) - torch.exp(mel_pred), p="fro") / torch.norm(torch.exp(mel_pred), p="fro")
 
             factor = 1. if step < pretraining_steps else 0.
 
