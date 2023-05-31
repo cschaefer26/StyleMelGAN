@@ -127,8 +127,7 @@ class Generator(nn.Module):
         with torch.no_grad():
             pad = torch.full((1, 80, pad_steps), -11.5129).to(mel.device)
             mel = torch.cat((mel, pad), dim=2)
-
-            s, p = self.forward(mel).squeeze()
+            s, p = self.forward(mel)
         return s, p
 
     @classmethod
