@@ -187,9 +187,10 @@ if __name__ == '__main__':
     import time
     config = read_config('../configs/melgan_config.yaml')
     model = Generator(80)
-    x = torch.randn(3, 80, 1000)
     start = time.time()
-    y  = model(x)
+    for i in range(5):
+        x = torch.randn(1, 80, 1000)
+        y = model(x)
     #print(y.size())
 
     dur = time.time() - start
