@@ -1,16 +1,10 @@
-from typing import Tuple, Dict, Any
+from typing import Dict, Any
 
-import torch
-from torch.nn import Module, ModuleList, Sequential, LeakyReLU, Tanh, Conv1d
-from torch.nn.utils import weight_norm
-
-from stylemelgan.common import WNConv1d, WNConvTranspose1d
-from stylemelgan.losses import TorchSTFT
-from stylemelgan.utils import read_config
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import numpy as np
+from torch.nn import Sequential
+
+from stylemelgan.utils import read_config
 
 MAX_WAV_VALUE = 32768.0
 
@@ -111,53 +105,43 @@ class Generator(nn.Module):
 
         self.generator_hifigan = nn.Sequential(
             nn.ReflectionPad1d(3),
-            nn.utils.weight_norm(nn.Conv1d(mel_channel, 256, kernel_size=7, stride=1)),
+            nn.utils.weight_norm(nn.Conv1d(mel_channel, 512, kernel_size=7, stride=1)),
+
+            nn.LeakyReLU(0.2),
+            nn.utils.weight_norm(nn.ConvTranspose1d(512, 256, kernel_size=16, stride=8, padding=4)),
+
+            ResStackHifi(256, kernel_sizes=(3, 7, 11)),
 
             nn.LeakyReLU(0.2),
             nn.utils.weight_norm(nn.ConvTranspose1d(256, 128, kernel_size=16, stride=8, padding=4)),
 
             ResStackHifi(128, kernel_sizes=(3, 7, 11)),
-
-            nn.LeakyReLU(0.2),
-            nn.utils.weight_norm(nn.ConvTranspose1d(128, 64, kernel_size=16, stride=8, padding=4)),
-
-            ResStackHifi(64, kernel_sizes=(3, 7, 11)),
             nn.LeakyReLU(0.2),
         )
 
         self.generator_melgan = Sequential(
+            nn.utils.weight_norm(nn.ConvTranspose1d(128, 64, kernel_size=4, stride=2, padding=1)),
 
-            nn.utils.weight_norm(nn.ConvTranspose1d(64, 32, kernel_size=4, stride=2, padding=1)),
-
-            ResStack(32, num_layers=8),
+            ResStack(64, num_layers=8),
 
             nn.LeakyReLU(0.2),
-            nn.utils.weight_norm(nn.ConvTranspose1d(32, 16, kernel_size=4, stride=2, padding=1)),
+            nn.utils.weight_norm(nn.ConvTranspose1d(64, 32, kernel_size=4, stride=2, padding=1)),
 
-            ResStack(16, num_layers=9),
+            ResStack(32, num_layers=9),
 
             nn.LeakyReLU(0.2),
             nn.ReflectionPad1d(3),
-            nn.utils.weight_norm(nn.Conv1d(16, 1, kernel_size=7, stride=1)),
+            nn.utils.weight_norm(nn.Conv1d(32, 1, kernel_size=7, stride=1)),
             nn.Tanh(),
 
         )
-
-        self.post_n_fft = 16
-        self.conv_post = weight_norm(Conv1d(64, self.post_n_fft + 2, 7, 1, padding=3))
-        self.reflection_pad = torch.nn.ReflectionPad1d((1, 0))
 
     def forward(self, mel):
         mel = (mel + 5.0) / 5.0 # roughly normalize spectrogram
         x = self.generator_hifigan(mel)
         y = self.generator_melgan(x)
 
-        x = self.reflection_pad(x)
-        x = self.conv_post(x)
-        spec = torch.exp(x[:, :self.post_n_fft // 2 + 1, :])
-        phase = torch.sin(x[:, self.post_n_fft // 2 + 1:, :])
-
-        return spec, phase, y
+        return y
 
     def eval(self, inference=False):
         super(Generator, self).eval()
@@ -180,8 +164,8 @@ class Generator(nn.Module):
         with torch.no_grad():
             pad = torch.full((1, 80, pad_steps), -11.5129).to(mel.device)
             mel = torch.cat((mel, pad), dim=2)
-            spec, phase, y = self.forward(mel)
-        return spec, phase, y
+            out = self.forward(mel)
+        return out
 
     @classmethod
     def from_config(cls, config: Dict[str, Any]) -> 'Generator':
@@ -201,9 +185,9 @@ if __name__ == '__main__':
     import time
     config = read_config('../configs/melgan_config.yaml')
     model = Generator(80)
+    x = torch.randn(3, 80, 1000)
     start = time.time()
     for i in range(5):
-        x = torch.randn(1, 80, 1000)
         y = model(x)
     #print(y.size())
 

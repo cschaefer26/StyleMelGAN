@@ -91,10 +91,7 @@ if __name__ == '__main__':
             mel = data['mel'].to(device)
             wav_real = data['wav'].to(device)
 
-            spec, phase, wav_fake = g_model(mel)
-            wav_fake_istft = torch_stft.inverse(spec, phase)
-
-            #print(wav_fake.size())
+            wav_fake = g_model(mel)[:, :, :train_cfg['segment_len']]
 
             d_loss = 0.0
             g_loss = 0.0
@@ -121,7 +118,7 @@ if __name__ == '__main__':
 
             factor = 10. if step < pretraining_steps else 10.
 
-            stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake_istft.squeeze(1), wav_real.squeeze(1))
+            stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
             g_loss_all = g_loss + factor * (stft_norm_loss + stft_spec_loss)
 
             g_optim.zero_grad()
@@ -148,8 +145,7 @@ if __name__ == '__main__':
                 for i, val_data in enumerate(val_dataset):
                     val_mel = val_data['mel'].to(device)
                     val_mel = val_mel.unsqueeze(0)
-                    s, p, wav_fake = g_model.inference(val_mel)
-                    wav_fake = wav_fake.squeeze().cpu().numpy()
+                    wav_fake = g_model.inference(val_mel).squeeze().cpu().numpy()
                     wav_real = val_data['wav'].detach().squeeze().cpu().numpy()
                     wav_f = torch.tensor(wav_fake).unsqueeze(0).to(device)
                     wav_r = torch.tensor(wav_real).unsqueeze(0).to(device)
