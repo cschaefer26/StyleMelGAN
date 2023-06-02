@@ -143,7 +143,7 @@ if __name__ == '__main__':
                 diff = diff.mean(1) * 100.
                 print('max: ', diff.max())
 
-            _, p_out = p_model(mel_fake)
+            p_out = p_model(mel_fake)
             p_loss = (p_out - diff) ** 2
             p_loss = 1000. * p_loss.mean()
 
