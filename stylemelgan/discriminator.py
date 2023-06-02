@@ -13,6 +13,23 @@ class Identity(nn.Module):
         return x
 
 
+class MelDiscriminator(nn.Module):
+    def __init__(self):
+        super(MelDiscriminator, self).__init__()
+
+        self.discriminator = nn.Sequential(
+            nn.ReflectionPad1d(2),
+            nn.utils.weight_norm(nn.Conv1d(80, 512, kernel_size=5, stride=1)),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.utils.weight_norm(nn.Conv1d(512, 512, kernel_size=5, stride=1, padding=2)),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.utils.weight_norm(nn.Conv1d(512, 1, kernel_size=3, stride=1, padding=1)),
+        )
+
+    def forward(self, x):
+        return self.discriminator(x)
+
+
 class Discriminator(nn.Module):
     def __init__(self):
         super(Discriminator, self).__init__()
