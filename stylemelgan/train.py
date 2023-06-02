@@ -96,6 +96,9 @@ if __name__ == '__main__':
     best_stft = 9999
     best_exp = 9999
 
+    g_model.train()
+    g_model_base.train()
+
     for epoch in range(train_cfg['epochs']):
         pbar = tqdm.tqdm(enumerate(zip(dataloader, train_mel_dataloader), 1), total=len(dataloader))
         for i, (data, data_mel) in pbar:
