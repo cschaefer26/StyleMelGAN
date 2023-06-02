@@ -47,22 +47,22 @@ if __name__ == '__main__':
     step = 0
 
     g_model = Generator(audio.n_mels).to(device)
+    g_model_base = Generator(audio.n_mels).to(device)
     d_model = MultiScaleDiscriminator().to(device)
     train_cfg = config['training']
+
     g_optim = torch.optim.Adam(g_model.parameters(), lr=train_cfg['g_lr'], betas=(0.5, 0.9))
-    d_optim = torch.optim.Adam(d_model.parameters(), lr=train_cfg['d_lr'], betas=(0.5, 0.9))
+
     for g in g_optim.param_groups:
         g['lr'] = train_cfg['g_lr']
-    for g in d_optim.param_groups:
-        g['lr'] = train_cfg['d_lr']
+
     multires_stft_loss = MultiResStftLoss().to(device)
 
     try:
         checkpoint = torch.load(f'checkpoints/latest_model__{model_name}.pt', map_location=device)
         g_model.load_state_dict(checkpoint['model_g'])
-        g_optim.load_state_dict(checkpoint['optim_g'])
+        g_model_base.load_state_dict(checkpoint['model_g'])
         d_model.load_state_dict(checkpoint['model_d'])
-        d_optim.load_state_dict(checkpoint['optim_d'])
         step = checkpoint['step']
         print(f'Loaded model with step {step}')
     except Exception as e:
@@ -75,8 +75,8 @@ if __name__ == '__main__':
                                 num_workers=train_cfg['num_workers'], sample_rate=audio.sample_rate)
 
     mel_files = list(train_pred_data_path.glob('**/*.pt'))
-    val_mel_files = mel_files[:512]
-    train_mel_files = mel_files[512:]
+    val_mel_files = mel_files[:2]
+    train_mel_files = mel_files[2:]
     train_mel_dataloader = new_mel_dataloader(files=train_mel_files, segment_len=train_cfg['segment_len'],
                                         hop_len=audio.hop_length, batch_size=train_cfg['batch_size'],
                                         num_workers=train_cfg['num_workers'])
@@ -100,49 +100,34 @@ if __name__ == '__main__':
         pbar = tqdm.tqdm(enumerate(zip(dataloader, train_mel_dataloader), 1), total=len(dataloader))
         for i, (data, data_mel) in pbar:
             step += 1
-            mel = data['mel'].to(device)
-            wav_real = data['wav'].to(device)
-
-            wav_fake = g_model(mel)[:, :, :train_cfg['segment_len']]
+            mel_pred = data_mel['mel_post'].to(device)
+            wav_fake = g_model(mel_pred)
+            wav_real = g_model_base(mel_pred)
 
             d_loss = 0.0
             g_loss = 0.0
             stft_norm_loss = 0.0
             stft_spec_loss = 0.0
 
-            if step > pretraining_steps:
-                # discriminator
-                d_fake = d_model(wav_fake.detach())
-                d_real = d_model(wav_real)
-                for (_, score_fake), (_, score_real) in zip(d_fake, d_real):
-                    d_loss += torch.mean(torch.sum(torch.pow(score_real - 1.0, 2), dim=[1, 2]))
-                    d_loss += torch.mean(torch.sum(torch.pow(score_fake, 2), dim=[1, 2]))
-                d_optim.zero_grad()
-                d_loss.backward()
-                d_optim.step()
+            d_fake = d_model(wav_fake)
+            d_real = d_model(wav_fake)
+            for (feat_fake, score_fake), (feat_real, _) in zip(d_fake, d_real):
+                g_loss += torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
+                for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
+                    g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
-                # generator
-                d_fake = d_model(wav_fake)
-                for (feat_fake, score_fake), (feat_real, _) in zip(d_fake, d_real):
-                    g_loss += torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
-                    for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
-                        g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
-
-
-            mel_pred = data_mel['mel_post'].to(device)
-
-            wav_pred_fake = g_model(mel_pred)
-            mel_fake = mel_spectrogram(wav_pred_fake.squeeze(1), n_fft=1024, num_mels=80, sampling_rate=22050, hop_size=256,
+            mel_fake = mel_spectrogram(wav_fake.squeeze(1), n_fft=1024, num_mels=80, sampling_rate=22050, hop_size=256,
                                        win_size=1024, fmin=0, fmax=8000)
-            #mel_pred_loss = 10000. * F.mse_loss(torch.exp(mel_fake), torch.exp(mel_pred))
-            mel_pred_loss = 1000. * torch.norm(torch.exp(mel_fake) - torch.exp(mel_pred), p="fro") / torch.norm(torch.exp(mel_pred), p="fro")
+
+            diff = (torch.exp(mel_fake) - torch.exp(mel_pred)) ** 2
+            mel_pred_loss = diff.sum()
 
             print(mel_pred_loss)
 
             factor = 1. if step < pretraining_steps else 0.
 
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
-            g_loss_all = g_loss + mel_pred_loss + factor * (stft_norm_loss + stft_spec_loss)
+            g_loss_all = g_loss + mel_pred_loss
 
             g_optim.zero_grad()
             g_loss_all.backward()
@@ -193,7 +178,6 @@ if __name__ == '__main__':
                         'model_g': g_model.state_dict(),
                         'optim_g': g_optim.state_dict(),
                         'model_d': d_model.state_dict(),
-                        'optim_d': d_optim.state_dict(),
                         'config': config,
                         'step': step
                     }, f'checkpoints/best_model_{model_name}.pt')
@@ -247,7 +231,6 @@ if __name__ == '__main__':
             'model_g': g_model.state_dict(),
             'optim_g': g_optim.state_dict(),
             'model_d': d_model.state_dict(),
-            'optim_d': d_optim.state_dict(),
             'config': config,
             'step': step
         }, f'checkpoints/latest_model__{model_name}.pt')
