@@ -6,7 +6,6 @@ import torch
 import torch.nn.functional as F
 import tqdm
 from matplotlib.figure import Figure
-from statsmodels.distributions.discrete import DiscretizedCount
 from torch.cuda import is_available
 from torch.utils.tensorboard import SummaryWriter
 
