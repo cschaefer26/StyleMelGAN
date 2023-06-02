@@ -232,7 +232,6 @@ if __name__ == '__main__':
                         #mel_pred_loss = 1000. * torch.norm(torch.exp(mel_fake) - torch.exp(val_mel_pred), p="fro") / torch.norm(torch.exp(val_mel_pred), p="fro")
                         diff = (torch.exp(mel_fake) - torch.exp(val_mel_pred)) ** 2
                         diff = diff.mean(1)
-                        diff[diff < 0.005] = 0
                         mel_pred_loss = 100. * diff.mean()
 
                         if mel_pred_loss > worst[0]:
