@@ -136,7 +136,7 @@ if __name__ == '__main__':
                                        win_size=1024, fmin=0, fmax=8000)
             diff = (torch.exp(mel_fake) - torch.exp(mel_pred)) ** 2
 
-            mel_pred_loss = diff.sum()#torch.norm(torch.exp(mel_fake) - torch.exp(mel_pred), p="fro") / torch.norm(torch.exp(mel_pred), p="fro")
+            mel_pred_loss = 0.1*diff.sum()#torch.norm(torch.exp(mel_fake) - torch.exp(mel_pred), p="fro") / torch.norm(torch.exp(mel_pred), p="fro")
 
             factor = 1. if step < pretraining_steps else 0.
 
