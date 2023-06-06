@@ -75,7 +75,7 @@ class Generator(nn.Module):
             nn.LeakyReLU(0.2),
         )
 
-        self.post_n_fft = 4
+        self.post_n_fft = 8
         self.conv_post = weight_norm(Conv1d(64, self.post_n_fft + 2, 7, 1, padding=3))
         self.reflection_pad = torch.nn.ReflectionPad1d((1, 0))
 

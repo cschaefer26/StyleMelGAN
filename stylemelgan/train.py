@@ -11,7 +11,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from stylemelgan.audio import Audio
 from stylemelgan.dataset import new_dataloader, AudioDataset
-from stylemelgan.discriminator import MultiScaleDiscriminator,  MultiPeriodDiscriminator
+from stylemelgan.discriminator import MultiScaleDiscriminator
 from stylemelgan.generator.melgan import Generator
 from stylemelgan.losses import stft, MultiResStftLoss, TorchSTFT
 from stylemelgan.utils import read_config
@@ -92,15 +92,11 @@ if __name__ == '__main__':
             wav_real = data['wav'].to(device)
 
             spec, phase = g_model(mel)
-            #wav_fake = g_model(mel)[:, :, :train_cfg['segment_len']]
             wav_fake = torch_stft.inverse(spec, phase)
-
-            #print(wav_fake.size())
 
             d_loss = 0.0
             p_loss = 0.0
             g_loss = 0.0
-            gp_loss = 0.0
             stft_norm_loss = 0.0
             stft_spec_loss = 0.0
 
@@ -125,7 +121,7 @@ if __name__ == '__main__':
             factor = 10. if step < pretraining_steps else 10.
 
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
-            g_loss_all = g_loss + gp_loss + factor * (stft_norm_loss + stft_spec_loss)
+            g_loss_all = g_loss + factor * (stft_norm_loss + stft_spec_loss)
 
             g_optim.zero_grad()
             g_loss_all.backward()
@@ -133,13 +129,11 @@ if __name__ == '__main__':
 
             pbar.set_description(desc=f'Epoch: {epoch} | Step {step} '
                                       f'| g_loss: {g_loss:#.4} '
-                                      f'| gp_loss: {gp_loss:#.4} '
                                       f'| d_loss: {d_loss:#.4} '
                                       f'| stft_norm_loss {stft_norm_loss:#.4} '
                                       f'| stft_spec_loss {stft_spec_loss:#.4} ', refresh=True)
 
             summary_writer.add_scalar('generator_loss', g_loss, global_step=step)
-            summary_writer.add_scalar('generator_p_loss', gp_loss, global_step=step)
             summary_writer.add_scalar('stft_norm_loss', stft_norm_loss, global_step=step)
             summary_writer.add_scalar('stft_spec_loss', stft_spec_loss, global_step=step)
             summary_writer.add_scalar('d_loss', d_loss, global_step=step)
