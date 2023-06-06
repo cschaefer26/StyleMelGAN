@@ -47,16 +47,12 @@ if __name__ == '__main__':
 
     g_model = Generator(audio.n_mels).to(device)
     d_model = MultiScaleDiscriminator().to(device)
-    p_model = MultiPeriodDiscriminator().to(device)
     train_cfg = config['training']
     g_optim = torch.optim.Adam(g_model.parameters(), lr=train_cfg['g_lr'], betas=(0.5, 0.9))
     d_optim = torch.optim.Adam(d_model.parameters(), lr=train_cfg['d_lr'], betas=(0.5, 0.9))
-    p_optim = torch.optim.Adam(p_model.parameters(), lr=train_cfg['d_lr'], betas=(0.5, 0.9))
     for g in g_optim.param_groups:
         g['lr'] = train_cfg['g_lr']
     for g in d_optim.param_groups:
-        g['lr'] = train_cfg['d_lr']
-    for g in p_optim.param_groups:
         g['lr'] = train_cfg['d_lr']
     multires_stft_loss = MultiResStftLoss().to(device)
 
@@ -66,8 +62,6 @@ if __name__ == '__main__':
         g_optim.load_state_dict(checkpoint['g_optim'])
         d_model.load_state_dict(checkpoint['d_model'])
         d_optim.load_state_dict(checkpoint['d_optim'])
-        p_model.load_state_dict(checkpoint['p_model'])
-        p_optim.load_state_dict(checkpoint['p_optim'])
         step = checkpoint['step']
         print(f'Loaded model with step {step}')
     except Exception as e:
@@ -83,7 +77,6 @@ if __name__ == '__main__':
     stft = partial(stft, n_fft=1024, hop_length=256, win_length=1024)
 
     torch_stft = TorchSTFT(filter_length=8, hop_length=2, win_length=8).to(device)
-
 
     pretraining_steps = train_cfg['pretraining_steps']
 
@@ -122,16 +115,6 @@ if __name__ == '__main__':
                 d_loss.backward()
                 d_optim.step()
 
-                # discriminator p
-                p_fake = p_model(wav_fake.detach())
-                p_real = p_model(wav_real)
-                for (_, score_fake), (_, score_real) in zip(p_fake, p_real):
-                    p_loss += torch.mean(torch.pow(score_real - 1.0, 2))
-                    p_loss += torch.mean(torch.pow(score_fake, 2))
-                p_optim.zero_grad()
-                p_loss.backward()
-                p_optim.step()
-
                 # generator
                 d_fake = d_model(wav_fake)
                 for (feat_fake, score_fake), (feat_real, _) in zip(d_fake, d_real):
@@ -139,14 +122,7 @@ if __name__ == '__main__':
                     for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
                         g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
-                # generator p
-                p_fake = p_model(wav_fake)
-                for (feat_fake, score_fake), (feat_real, _) in zip(p_fake, p_real):
-                    gp_loss += torch.mean(torch.pow(score_fake - 1.0, 2))
-                    for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
-                        gp_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
-
-            factor = 100. if step < pretraining_steps else 100.
+            factor = 10. if step < pretraining_steps else 10.
 
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
             g_loss_all = g_loss + gp_loss + factor * (stft_norm_loss + stft_spec_loss)
@@ -223,8 +199,6 @@ if __name__ == '__main__':
             'g_optim': g_optim.state_dict(),
             'd_model': d_model.state_dict(),
             'd_optim': d_optim.state_dict(),
-            'p_model': p_model.state_dict(),
-            'p_optim': p_optim.state_dict(),
             'config': config,
             'step': step
         }, f'checkpoints/latest_model__{model_name}.pt')
