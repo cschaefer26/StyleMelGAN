@@ -57,7 +57,7 @@ if __name__ == '__main__':
     multires_stft_loss = MultiResStftLoss().to(device)
 
     try:
-        #checkpoint = torch.load(f'checkpoints/latest_model__{model_name}.pt', map_location=device)
+        checkpoint = torch.load(f'checkpoints/latest_model__{model_name}.pt', map_location=device)
         g_model.load_state_dict(checkpoint['model_g'])
         g_optim.load_state_dict(checkpoint['optim_g'])
         d_model.load_state_dict(checkpoint['model_d'])
@@ -76,8 +76,6 @@ if __name__ == '__main__':
 
     stft = partial(stft, n_fft=1024, hop_length=256, win_length=1024)
 
-    torch_stft = TorchSTFT(filter_length=16, hop_length=4, win_length=16).to(device)
-
 
     pretraining_steps = train_cfg['pretraining_steps']
 
@@ -92,9 +90,7 @@ if __name__ == '__main__':
             mel = data['mel'].to(device)
             wav_real = data['wav'].to(device)
 
-            spec, phase = g_model(mel)
-            #wav_fake = g_model(mel)[:, :, :train_cfg['segment_len']]
-            wav_fake = torch_stft.inverse(spec, phase)
+            wav_fake = g_model(mel)
 
             #print(wav_fake.size())
 
@@ -150,8 +146,7 @@ if __name__ == '__main__':
                 for i, val_data in enumerate(val_dataset):
                     val_mel = val_data['mel'].to(device)
                     val_mel = val_mel.unsqueeze(0)
-                    s, p = g_model.inference(val_mel)
-                    wav_fake = torch_stft.inverse(s, p)
+                    wav_fake = g_model.inference(val_mel)
                     wav_fake = wav_fake.squeeze().cpu().numpy()
                     wav_real = val_data['wav'].detach().squeeze().cpu().numpy()
                     wav_f = torch.tensor(wav_fake).unsqueeze(0).to(device)
