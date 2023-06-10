@@ -91,10 +91,10 @@ class AudioDataset(Dataset):
         file_id = self.file_ids[item_id]
         wav_path = self.data_path / f'{file_id}.wav'
         wav, _ = librosa.load(wav_path, sr=self.sample_rate)
-        max_scale = min(0.95 / np.max(wav), 1.5)
+        #max_scale = min(0.95 / np.max(wav), 1.5)
         audio = torch.tensor(wav).float().unsqueeze(0)
         if self.segment_len is not None:
-            audio = audio * float(np.random.uniform(low=0.5, high=max_scale))
+            #audio = audio * float(np.random.uniform(low=0.5, high=max_scale))
             if audio.size(1) >= self.segment_len:
                 max_audio_start = audio.size(1) - self.segment_len
                 audio_start = random.randint(0, max_audio_start)
