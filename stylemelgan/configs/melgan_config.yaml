@@ -1,5 +1,5 @@
 model_type: 'melgan'
-model_name: 'welt_predtuning'
+model_name: 'welt_hifi'
 
 paths:
   train_dir: '/Users/cschaefe/datasets/stylemelgan_welt_train'

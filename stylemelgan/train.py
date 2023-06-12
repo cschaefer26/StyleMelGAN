@@ -149,7 +149,7 @@ if __name__ == '__main__':
 
             mel_pred_loss = 100. * torch.norm(torch.exp(mel_fake) - torch.exp(mel_pred), p="fro") / torch.norm(torch.exp(mel_pred), p="fro")
 
-            factor = 1. if step < pretraining_steps else 0.
+            factor = 10. if step < pretraining_steps else 10.
 
             stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
             g_loss_all = g_loss + mel_pred_loss + factor * (stft_norm_loss + stft_spec_loss)
@@ -221,11 +221,11 @@ if __name__ == '__main__':
                         mel_fake = mel_spectrogram(wav_pred_fake.squeeze(1), n_fft=1024, num_mels=80, sampling_rate=22050, hop_size=256,
                                                    win_size=1024, fmin=0, fmax=8000)
                         #mel_pred_loss = 10000. * F.mse_loss(torch.exp(mel_fake), torch.exp(mel_pred))
-                        #mel_pred_loss = 1000. * torch.norm(torch.exp(mel_fake) - torch.exp(val_mel_pred), p="fro") / torch.norm(torch.exp(val_mel_pred), p="fro")
-                        diff = (torch.exp(mel_fake) - torch.exp(val_mel_pred)) ** 2
-                        diff = diff.mean(1)
-                        diff[diff < 0.005] = 0
-                        mel_pred_loss = 100. * diff.mean()
+                        mel_pred_loss = 1000. * torch.norm(torch.exp(mel_fake) - torch.exp(val_mel_pred), p="fro") / torch.norm(torch.exp(val_mel_pred), p="fro")
+                        #diff = (torch.exp(mel_fake) - torch.exp(val_mel_pred)) ** 2
+                        #diff = diff.mean(1)
+                        #diff[diff < 0.005] = 0
+                        #mel_pred_loss = diff.mean()
 
                         if mel_pred_loss > worst[0]:
                             worst = (mel_pred_loss, wav_pred_fake)
