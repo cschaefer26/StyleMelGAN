@@ -173,7 +173,7 @@ if __name__ == '__main__':
 
                 for i, val_data in enumerate(val_dataset):
                     val_mel_orig = val_data['mel'].to(device)
-                    val_mel = val_mel.unsqueeze(0)
+                    val_mel_orig = val_mel_orig.unsqueeze(0)
                     val_mel = a_model(val_mel_orig)
 
 
