@@ -11,7 +11,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from stylemelgan.audio import Audio
 from stylemelgan.dataset import new_dataloader, AudioDataset
-from stylemelgan.discriminator import MultiScaleDiscriminator
+from stylemelgan.discriminator import MultiScaleDiscriminator, Autoencoder
 from stylemelgan.generator.melgan import Generator
 from stylemelgan.losses import stft, MultiResStftLoss, TorchSTFT
 from stylemelgan.utils import read_config
@@ -47,9 +47,12 @@ if __name__ == '__main__':
 
     g_model = Generator(audio.n_mels).to(device)
     d_model = MultiScaleDiscriminator().to(device)
+    a_model = Autoencoder().to(device)
     train_cfg = config['training']
     g_optim = torch.optim.Adam(g_model.parameters(), lr=train_cfg['g_lr'], betas=(0.5, 0.9))
     d_optim = torch.optim.Adam(d_model.parameters(), lr=train_cfg['d_lr'], betas=(0.5, 0.9))
+    a_optim = torch.optim.Adam(a_model.parameters(), 1e-4, betas=(0.5, 0.9))
+
     for g in g_optim.param_groups:
         g['lr'] = train_cfg['g_lr']
     for g in d_optim.param_groups:
@@ -57,14 +60,20 @@ if __name__ == '__main__':
     multires_stft_loss = MultiResStftLoss().to(device)
 
     try:
-        #checkpoint = torch.load(f'checkpoints/latest_model__{model_name}.pt', map_location=device)
+        checkpoint = torch.load(f'checkpoints/latest_model__{model_name}.pt', map_location=device)
         g_model.load_state_dict(checkpoint['model_g'])
         g_optim.load_state_dict(checkpoint['optim_g'])
         d_model.load_state_dict(checkpoint['model_d'])
         d_optim.load_state_dict(checkpoint['optim_d'])
+        try:
+            a_model.load_state_dict(checkpoint['model_a'])
+            a_optim.load_state_dict(checkpoint['optim_a'])
+        except Exception as b:
+            print(b)
         step = checkpoint['step']
         print(f'Loaded model with step {step}')
     except Exception as e:
+        print(e)
         'Initializing model from scratch.'
 
     train_cfg = config['training']
@@ -78,25 +87,40 @@ if __name__ == '__main__':
 
     torch_stft = TorchSTFT(filter_length=16, hop_length=4, win_length=16).to(device)
 
-
     pretraining_steps = train_cfg['pretraining_steps']
 
     summary_writer = SummaryWriter(log_dir=f'checkpoints/logs_{model_name}')
 
     best_stft = 9999
 
+    auto_epochs = 100
+    pre_step = 0
+
+    for pre_epoch in range(auto_epochs):
+        pbar = tqdm.tqdm(enumerate(dataloader, 1), total=len(dataloader))
+        for i, data in pbar:
+            pre_step += 1
+            mel_orig = data['mel'].to(device)
+            mel = a_model(mel_orig)
+            loss = F.l1_loss(mel_orig, mel)
+            a_optim.zero_grad()
+            loss.backward()
+            a_optim.step()
+            pbar.set_description(desc=f'Pre Epoch: {pre_epoch} | Step {step} '
+                                      f'| auto loss {loss:#.4} ', refresh=True)
+            summary_writer.add_scalar('auto_loss', loss, global_step=step)
+
     for epoch in range(train_cfg['epochs']):
         pbar = tqdm.tqdm(enumerate(dataloader, 1), total=len(dataloader))
         for i, data in pbar:
             step += 1
-            mel = data['mel'].to(device)
+            mel_orig = data['mel'].to(device)
+            mel = a_model(mel_orig)
+
             wav_real = data['wav'].to(device)
 
             spec, phase = g_model(mel)
-            #wav_fake = g_model(mel)[:, :, :train_cfg['segment_len']]
             wav_fake = torch_stft.inverse(spec, phase)
-
-            #print(wav_fake.size())
 
             d_loss = 0.0
             g_loss = 0.0
@@ -148,7 +172,9 @@ if __name__ == '__main__':
                 val_wavs = []
 
                 for i, val_data in enumerate(val_dataset):
-                    val_mel = val_data['mel'].to(device)
+                    val_mel_orig = val_data['mel'].to(device)
+                    val_mel = a_model(val_mel_orig)
+
                     val_mel = val_mel.unsqueeze(0)
                     s, p = g_model.inference(val_mel)
                     wav_fake = torch_stft.inverse(s, p)
@@ -174,8 +200,6 @@ if __name__ == '__main__':
                     torch.save({
                         'model_g': g_model.state_dict(),
                         'optim_g': g_optim.state_dict(),
-                        'model_d': d_model.state_dict(),
-                        'optim_d': d_optim.state_dict(),
                         'config': config,
                         'step': step
                     }, f'checkpoints/best_model_{model_name}.pt')
@@ -197,6 +221,8 @@ if __name__ == '__main__':
             'optim_g': g_optim.state_dict(),
             'model_d': d_model.state_dict(),
             'optim_d': d_optim.state_dict(),
+            'model_a': a_model.state_dict(),
+            'optim_a': a_optim.state_dict(),
             'config': config,
             'step': step
         }, f'checkpoints/latest_model__{model_name}.pt')

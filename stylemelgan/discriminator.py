@@ -13,6 +13,21 @@ class Identity(nn.Module):
         return x
 
 
+class Autoencoder(nn.Module):
+
+    def __init__(self):
+        super(Autoencoder, self).__init__()
+        self.autoenc = nn.Sequential(
+            nn.ReflectionPad1d(2),
+            nn.utils.weight_norm(nn.Conv1d(80, 256, kernel_size=5, stride=1)),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.utils.weight_norm(nn.Conv1d(256, 80, kernel_size=1, stride=1)),
+        )
+
+    def forward(self, x):
+        return self.autoenc(x)
+
+
 class Discriminator(nn.Module):
     def __init__(self):
         super(Discriminator, self).__init__()
