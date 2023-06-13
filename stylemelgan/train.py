@@ -108,7 +108,7 @@ if __name__ == '__main__':
             a_optim.step()
             pbar.set_description(desc=f'Pre Epoch: {pre_epoch} | Step {step} '
                                       f'| auto loss {loss:#.4} ', refresh=True)
-            summary_writer.add_scalar('auto_loss', loss, global_step=step)
+            summary_writer.add_scalar('auto_loss', loss, global_step=pre_step)
 
     for epoch in range(train_cfg['epochs']):
         pbar = tqdm.tqdm(enumerate(dataloader, 1), total=len(dataloader))
