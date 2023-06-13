@@ -175,15 +175,17 @@ if __name__ == '__main__':
                     val_mel_orig = val_data['mel'].to(device)
                     val_mel_orig = val_mel_orig.unsqueeze(0)
                     val_mel = a_model(val_mel_orig)
-
-
                     s, p = g_model.inference(val_mel)
                     wav_fake = torch_stft.inverse(s, p)
+                    s, p = g_model.inference(val_mel_orig)
+                    wav_fake_orig = torch_stft.inverse(s, p)
+
+
                     wav_fake = wav_fake.squeeze().cpu().numpy()
                     wav_real = val_data['wav'].detach().squeeze().cpu().numpy()
                     wav_f = torch.tensor(wav_fake).unsqueeze(0).to(device)
                     wav_r = torch.tensor(wav_real).unsqueeze(0).to(device)
-                    val_wavs.append((wav_fake, wav_real))
+                    val_wavs.append((wav_fake, wav_real, wav_fake_orig))
                     size = min(wav_r.size(-1), wav_f.size(-1))
                     val_n, val_s = multires_stft_loss(wav_f[..., :size], wav_r[..., :size])
                     val_norm_loss += val_n
@@ -194,7 +196,7 @@ if __name__ == '__main__':
                 summary_writer.add_scalar('val_stft_norm_loss', val_norm_loss, global_step=step)
                 summary_writer.add_scalar('val_stft_spec_loss', val_spec_loss, global_step=step)
                 val_wavs.sort(key=lambda x: x[1].shape[0])
-                wav_fake, wav_real = val_wavs[-1]
+                wav_fake, wav_real, wav_fake_orig = val_wavs[-1]
                 if val_norm_loss + val_spec_loss < best_stft:
                     best_stft = val_norm_loss + val_spec_loss
                     print(f'\nnew best stft: {best_stft}')
@@ -207,6 +209,7 @@ if __name__ == '__main__':
                     summary_writer.add_audio('best_generated', wav_fake, sample_rate=audio.sample_rate, global_step=step)
 
                 g_model.train()
+                summary_writer.add_audio('generated_orig', wav_fake_orig, sample_rate=audio.sample_rate, global_step=step)
                 summary_writer.add_audio('generated', wav_fake, sample_rate=audio.sample_rate, global_step=step)
                 summary_writer.add_audio('target', wav_real, sample_rate=audio.sample_rate, global_step=step)
                 mel_fake = audio.wav_to_mel(wav_fake)
