@@ -174,7 +174,7 @@ if __name__ == '__main__':
                 for i, val_data in enumerate(val_dataset):
                     val_mel_orig = val_data['mel'].to(device)
                     val_mel_orig = val_mel_orig.unsqueeze(0)
-                    val_mel = a_model(val_mel_orig)
+                    val_mel = a_model(val_mel_orig, p=0.4)
                     s, p = g_model.inference(val_mel)
                     wav_fake = torch_stft.inverse(s, p)
                     s, p = g_model.inference(val_mel_orig)

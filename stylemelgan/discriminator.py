@@ -28,9 +28,10 @@ class Autoencoder(nn.Module):
             nn.utils.weight_norm(nn.Conv1d(256, 80, kernel_size=1, stride=1)),
         )
 
-    def forward(self, x):
+    def forward(self, x, p=None):
         x = self.enc(x)
-        p = float(torch.rand(1)) * self.max_p
+        if p is None:
+            p = float(torch.rand(1)) * self.max_p
         x = F.dropout(x, p=p)
         return self.dec(x)
 
