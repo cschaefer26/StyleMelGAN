@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.nn import Sequential, LeakyReLU
 
 from stylemelgan.common import WNConv1d
@@ -15,17 +16,23 @@ class Identity(nn.Module):
 
 class Autoencoder(nn.Module):
 
-    def __init__(self):
+    def __init__(self, max_p=0.5):
         super(Autoencoder, self).__init__()
-        self.autoenc = nn.Sequential(
+        self.max_p = max_p
+        self.enc = nn.Sequential(
             nn.ReflectionPad1d(2),
             nn.utils.weight_norm(nn.Conv1d(80, 256, kernel_size=5, stride=1)),
+        )
+        self.dec = nn.Sequential(
             nn.LeakyReLU(0.2, inplace=True),
             nn.utils.weight_norm(nn.Conv1d(256, 80, kernel_size=1, stride=1)),
         )
 
     def forward(self, x):
-        return self.autoenc(x)
+        x = self.enc(x)
+        p = float(torch.rand(1)) * self.max_p
+        x = F.dropout(x, p=p)
+        return self.dec(x)
 
 
 class Discriminator(nn.Module):
