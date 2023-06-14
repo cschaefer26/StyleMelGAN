@@ -90,7 +90,14 @@ class AudioDataset(Dataset):
     def __getitem__(self, item_id: int) -> Dict[str, torch.Tensor]:
         file_id = self.file_ids[item_id]
         wav_path = self.data_path / f'{file_id}.wav'
-        wav, _ = librosa.load(wav_path, sr=self.sample_rate)
+        wav_path_npy = self.data_path / f'{file_id}.npy'
+
+        if Path(wav_path_npy).is_file():
+            wav = np.load(str(wav_path_npy))
+        else:
+            wav, _ = librosa.load(wav_path, sr=self.sample_rate)
+            np.save(str(wav_path_npy), wav)
+
         #max_scale = min(0.95 / np.max(wav), 1.5)
         audio = torch.tensor(wav).float().unsqueeze(0)
         if self.segment_len is not None:
