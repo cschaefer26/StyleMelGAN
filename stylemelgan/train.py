@@ -94,7 +94,7 @@ if __name__ == '__main__':
     best_stft = 9999
 
     auto_epochs = 20
-    pre_step = 1
+    pre_step = 20
 
     for pre_epoch in range(auto_epochs):
         pbar = tqdm.tqdm(enumerate(dataloader, 1), total=len(dataloader))
