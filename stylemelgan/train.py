@@ -10,9 +10,9 @@ from torch.cuda import is_available
 from torch.utils.tensorboard import SummaryWriter
 
 from stylemelgan.audio import Audio
-from stylemelgan.dataset import new_dataloader, AudioDataset
-from stylemelgan.discriminator import MultiScaleDiscriminator, Autoencoder
-from stylemelgan.generator.melgan import Generator
+from stylemelgan.dataset import new_dataloader, AudioDataset, mel_spectrogram
+from stylemelgan.discriminator import MultiScaleDiscriminator
+from stylemelgan.generator.melgan import Generator, Adapter
 from stylemelgan.losses import stft, MultiResStftLoss, TorchSTFT
 from stylemelgan.utils import read_config
 
@@ -47,7 +47,7 @@ if __name__ == '__main__':
 
     g_model = Generator(audio.n_mels).to(device)
     d_model = MultiScaleDiscriminator().to(device)
-    a_model = Autoencoder().to(device)
+    a_model = Adapter().to(device)
     train_cfg = config['training']
     g_optim = torch.optim.Adam(g_model.parameters(), lr=train_cfg['g_lr'], betas=(0.5, 0.9))
     d_optim = torch.optim.Adam(d_model.parameters(), lr=train_cfg['d_lr'], betas=(0.5, 0.9))
@@ -94,7 +94,7 @@ if __name__ == '__main__':
     best_stft = 9999
 
     auto_epochs = 20
-    pre_step = 20
+    pre_step = 1
 
     for pre_epoch in range(auto_epochs):
         pbar = tqdm.tqdm(enumerate(dataloader, 1), total=len(dataloader))
@@ -115,11 +115,10 @@ if __name__ == '__main__':
         for i, data in pbar:
             step += 1
             mel_orig = data['mel'].to(device)
-            mel = a_model(mel_orig)
 
             wav_real = data['wav'].to(device)
 
-            spec, phase = g_model(mel)
+            spec, phase = g_model(mel_orig)
             wav_fake = torch_stft.inverse(spec, phase)
 
             d_loss = 0.0
@@ -154,12 +153,29 @@ if __name__ == '__main__':
             g_loss_all.backward()
             g_optim.step()
 
+            mel = a_model(mel_orig)
+            with torch.no_grad():
+                spec, phase = g_model(mel)
+                wav_fake = torch_stft.inverse(spec, phase)
+
+            mel_fake = mel_spectrogram(wav_fake.squeeze(), n_fft=1024, num_mels=80, sampling_rate=22050, hop_size=256,
+                                       win_size=1024, fmin=0, fmax=8000)
+            fro_loss = 10 * torch.norm(torch.exp(mel_fake) - torch.exp(mel), p="fro") / torch.norm(torch.exp(mel), p="fro")
+            l1_loss = F.l1_loss(mel, mel_orig)
+            a_loss = fro_loss + l1_loss
+
+            a_optim.zero_grad()
+            a_loss.backward()
+            a_optim.step()
+
             pbar.set_description(desc=f'Epoch: {epoch} | Step {step} '
                                       f'| g_loss: {g_loss:#.4} '
                                       f'| d_loss: {d_loss:#.4} '
                                       f'| stft_norm_loss {stft_norm_loss:#.4} '
                                       f'| stft_spec_loss {stft_spec_loss:#.4} ', refresh=True)
 
+            summary_writer.add_scalar('ada_fro_loss', fro_loss, global_step=step)
+            summary_writer.add_scalar('ada_l1_loss', l1_loss, global_step=step)
             summary_writer.add_scalar('generator_loss', g_loss, global_step=step)
             summary_writer.add_scalar('stft_norm_loss', stft_norm_loss, global_step=step)
             summary_writer.add_scalar('stft_spec_loss', stft_spec_loss, global_step=step)
@@ -174,7 +190,7 @@ if __name__ == '__main__':
                 for i, val_data in enumerate(val_dataset):
                     val_mel_orig = val_data['mel'].to(device)
                     val_mel_orig = val_mel_orig.unsqueeze(0)
-                    val_mel = a_model(val_mel_orig, p=0.4)
+                    val_mel = a_model(val_mel_orig)
                     s, p = g_model.inference(val_mel)
                     wav_fake = torch_stft.inverse(s, p)
                     s, p = g_model.inference(val_mel_orig)

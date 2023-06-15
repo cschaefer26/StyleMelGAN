@@ -16,9 +16,9 @@ class Identity(nn.Module):
 
 class Autoencoder(nn.Module):
 
-    def __init__(self, max_p=0.5):
+    def __init__(self, p=0.1):
         super(Autoencoder, self).__init__()
-        self.max_p = max_p
+        self.p = p
         self.enc = nn.Sequential(
             nn.ReflectionPad1d(2),
             nn.utils.weight_norm(nn.Conv1d(80, 256, kernel_size=5, stride=1)),
@@ -28,11 +28,9 @@ class Autoencoder(nn.Module):
             nn.utils.weight_norm(nn.Conv1d(256, 80, kernel_size=1, stride=1)),
         )
 
-    def forward(self, x, p=None):
+    def forward(self, x):
         x = self.enc(x)
-        if p is None:
-            p = float(torch.rand(1)) * self.max_p
-        x = F.dropout(x, p=p)
+        x = F.dropout(x, p=self.p)
         return self.dec(x)
 
 

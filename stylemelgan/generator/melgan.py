@@ -72,6 +72,16 @@ class ResStack(nn.Module):
             nn.utils.remove_weight_norm(shortcut)
 
 
+class Adapter(nn.Module):
+
+    def __init__(self):
+        super(Adapter, self).__init__()
+        self.res = ResStack(80, kernel_sizes=(3, 7, 11), dilations=(1, ))
+
+    def forward(self, x):
+        return self.res(x)
+
+
 class Generator(nn.Module):
     def __init__(self, mel_channel):
         super(Generator, self).__init__()
