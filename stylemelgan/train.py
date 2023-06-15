@@ -114,7 +114,10 @@ if __name__ == '__main__':
         pbar = tqdm.tqdm(enumerate(dataloader, 1), total=len(dataloader))
         for i, data in pbar:
             step += 1
+
             mel_orig = data['mel'].to(device)
+
+            """
 
             wav_real = data['wav'].to(device)
 
@@ -152,11 +155,11 @@ if __name__ == '__main__':
             g_optim.zero_grad()
             g_loss_all.backward()
             g_optim.step()
+            """
 
             mel = a_model(mel_orig)
-            with torch.no_grad():
-                spec, phase = g_model(mel)
-                wav_fake = torch_stft.inverse(spec, phase)
+            spec, phase = g_model(mel)
+            wav_fake = torch_stft.inverse(spec, phase)
 
             mel_fake = mel_spectrogram(wav_fake.squeeze(), n_fft=1024, num_mels=80, sampling_rate=22050, hop_size=256,
                                        win_size=1024, fmin=0, fmax=8000)
@@ -168,18 +171,18 @@ if __name__ == '__main__':
             a_loss.backward()
             a_optim.step()
 
-            pbar.set_description(desc=f'Epoch: {epoch} | Step {step} '
-                                      f'| g_loss: {g_loss:#.4} '
-                                      f'| d_loss: {d_loss:#.4} '
-                                      f'| stft_norm_loss {stft_norm_loss:#.4} '
-                                      f'| stft_spec_loss {stft_spec_loss:#.4} ', refresh=True)
+            #pbar.set_description(desc=f'Epoch: {epoch} | Step {step} '
+            #                          f'| g_loss: {g_loss:#.4} '
+            #                          f'| d_loss: {d_loss:#.4} '
+            #                          f'| stft_norm_loss {stft_norm_loss:#.4} '
+            #                          f'| stft_spec_loss {stft_spec_loss:#.4} ', refresh=True)
 
-            summary_writer.add_scalar('ada_fro_loss', fro_loss, global_step=step)
-            summary_writer.add_scalar('ada_l1_loss', l1_loss, global_step=step)
-            summary_writer.add_scalar('generator_loss', g_loss, global_step=step)
-            summary_writer.add_scalar('stft_norm_loss', stft_norm_loss, global_step=step)
-            summary_writer.add_scalar('stft_spec_loss', stft_spec_loss, global_step=step)
-            summary_writer.add_scalar('discriminator_loss', d_loss, global_step=step)
+            #summary_writer.add_scalar('ada_fro_loss', fro_loss, global_step=step)
+            #summary_writer.add_scalar('ada_l1_loss', l1_loss, global_step=step)
+            #summary_writer.add_scalar('generator_loss', g_loss, global_step=step)
+            #summary_writer.add_scalar('stft_norm_loss', stft_norm_loss, global_step=step)
+            #summary_writer.add_scalar('stft_spec_loss', stft_spec_loss, global_step=step)
+            #summary_writer.add_scalar('discriminator_loss', d_loss, global_step=step)
 
             if step % train_cfg['eval_steps'] == 0:
                 g_model.eval()
