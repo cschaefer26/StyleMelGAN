@@ -57,6 +57,8 @@ if __name__ == '__main__':
         checkpoint = torch.load(f'checkpoints/latest_model__{model_name}.pt', map_location=device)
         g_model.load_state_dict(checkpoint['model_g'])
         g_optim.load_state_dict(checkpoint['optim_g'])
+        p_model.load_state_dict(checkpoint['model_p'])
+        p_optim.load_state_dict(checkpoint['optim_p'])
         step = checkpoint['step']
         print(f'Loaded model with step {step}')
     except Exception as e:
