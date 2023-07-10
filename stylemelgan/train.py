@@ -99,7 +99,7 @@ if __name__ == '__main__':
             step += 1
             mel = data['mel'].to(device)
             
-            mel_prenet = p_model(mel)[:, :, :train_cfg['segment_len']//256]
+            mel_prenet = p_model(data_mel)[:, :, :train_cfg['segment_len']//256]
 
             wav_pred_fake = g_model(mel)[:, :, :train_cfg['segment_len']]
             mel_fake = mel_spectrogram(wav_pred_fake.squeeze(1), n_fft=1024, num_mels=80, sampling_rate=22050, hop_size=256,
