@@ -108,7 +108,7 @@ if __name__ == '__main__':
             mel_fake = mel_fake[:, :, :train_cfg['segment_len']//256]
             mel = mel[:, :, :train_cfg['segment_len']//256]
             mel_prenet = mel_prenet[:, :, :train_cfg['segment_len']//256]
-            mel_pred_loss = torch.norm(torch.exp(mel_fake) - torch.exp(mel[:, :, :train_cfg['segment_len']//256]), p="fro") / torch.norm(torch.exp(mel), p="fro")
+            mel_pred_loss = 10. * torch.norm(torch.exp(mel_fake) - torch.exp(mel[:, :, :train_cfg['segment_len']//256]), p="fro") / torch.norm(torch.exp(mel), p="fro")
             mel_l1_loss = F.l1_loss(mel_prenet, mel)
 
             p_loss_all = mel_pred_loss + mel_l1_loss
