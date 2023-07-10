@@ -58,7 +58,7 @@ class Prenet(nn.Module):
         )
 
     def forward(self, x):
-        return x + self.convs(x)
+        return self.convs(x)
 
 
 class Generator(nn.Module):
