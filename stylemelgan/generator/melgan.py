@@ -46,6 +46,21 @@ class ResStack(nn.Module):
             nn.utils.remove_weight_norm(shortcut)
 
 
+class Prenet(nn.Module):
+
+    def __init__(self):
+        super(Prenet, self).__init__()
+        self.convs = nn.Sequential(
+            nn.ReflectionPad1d(3),
+            nn.utils.weight_norm(nn.Conv1d(80, 512, kernel_size=7, stride=1)),
+            nn.LeakyReLU(0.2),
+            nn.utils.weight_norm(nn.Conv1d(512, 80, kernel_size=3, stride=1, padding=1)),
+        )
+
+    def forward(self, x):
+        return self.convs(x)
+
+
 class Generator(nn.Module):
     def __init__(self, mel_channel):
         super(Generator, self).__init__()

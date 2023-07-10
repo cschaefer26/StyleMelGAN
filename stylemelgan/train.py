@@ -12,7 +12,7 @@ from torch.utils.tensorboard import SummaryWriter
 from stylemelgan.audio import Audio
 from stylemelgan.dataset import new_dataloader, AudioDataset, mel_spectrogram, new_mel_dataloader
 from stylemelgan.discriminator import MultiScaleDiscriminator
-from stylemelgan.generator.melgan import Generator
+from stylemelgan.generator.melgan import Generator, Prenet
 from stylemelgan.losses import stft, MultiResStftLoss
 from stylemelgan.utils import read_config
 
@@ -47,22 +47,16 @@ if __name__ == '__main__':
     step = 0
 
     g_model = Generator(audio.n_mels).to(device)
-    d_model = MultiScaleDiscriminator().to(device)
-    train_cfg = config['training']
-    g_optim = torch.optim.Adam(g_model.parameters(), lr=train_cfg['g_lr'], betas=(0.5, 0.9))
-    d_optim = torch.optim.Adam(d_model.parameters(), lr=train_cfg['d_lr'], betas=(0.5, 0.9))
-    for g in g_optim.param_groups:
-        g['lr'] = train_cfg['g_lr']
-    for g in d_optim.param_groups:
-        g['lr'] = train_cfg['d_lr']
+    p_model = Prenet().to(device)
+    g_optim = torch.optim.Adam(g_model.parameters(), lr=0.0001, betas=(0.5, 0.9))
+    p_optim = torch.optim.Adam(p_model.parameters(), lr=0.0001, betas=(0.5, 0.9))
+
     multires_stft_loss = MultiResStftLoss().to(device)
 
     try:
         checkpoint = torch.load(f'checkpoints/latest_model__{model_name}.pt', map_location=device)
         g_model.load_state_dict(checkpoint['model_g'])
         g_optim.load_state_dict(checkpoint['optim_g'])
-        d_model.load_state_dict(checkpoint['model_d'])
-        d_optim.load_state_dict(checkpoint['optim_d'])
         step = checkpoint['step']
         print(f'Loaded model with step {step}')
     except Exception as e:
@@ -75,14 +69,15 @@ if __name__ == '__main__':
                                 num_workers=train_cfg['num_workers'], sample_rate=audio.sample_rate)
 
     mel_files = list(train_pred_data_path.glob('**/*.pt'))
-    val_mel_files = mel_files[:512]
-    train_mel_files = mel_files[512:]
+    val_mel_files = mel_files[:2]
+    train_mel_files = mel_files[2:]
+
     train_mel_dataloader = new_mel_dataloader(files=train_mel_files, segment_len=train_cfg['segment_len'],
-                                        hop_len=audio.hop_length, batch_size=train_cfg['batch_size'],
-                                        num_workers=train_cfg['num_workers'])
+                                              hop_len=audio.hop_length, batch_size=train_cfg['batch_size'],
+                                              num_workers=train_cfg['num_workers'])
     val_mel_dataloader = new_mel_dataloader(files=val_mel_files, segment_len=None,
-                                        hop_len=audio.hop_length, batch_size=1,
-                                        num_workers=train_cfg['num_workers'])
+                                            hop_len=audio.hop_length, batch_size=1,
+                                            num_workers=train_cfg['num_workers'])
 
     val_dataset = AudioDataset(data_path=val_data_path, segment_len=None, hop_len=audio.hop_length,
                                sample_rate=audio.sample_rate)
@@ -96,70 +91,37 @@ if __name__ == '__main__':
     best_stft = 9999
     best_exp = 9999
 
+    g_model.eval()
+
     for epoch in range(train_cfg['epochs']):
         pbar = tqdm.tqdm(enumerate(zip(dataloader, train_mel_dataloader), 1), total=len(dataloader))
         for i, (data, data_mel) in pbar:
             step += 1
             mel = data['mel'].to(device)
-            wav_real = data['wav'].to(device)
+            
+            mel_prenet = p_model(mel)[:, :, :train_cfg['segment_len']//256]
 
-            wav_fake = g_model(mel)[:, :, :train_cfg['segment_len']]
-
-            d_loss = 0.0
-            g_loss = 0.0
-            stft_norm_loss = 0.0
-            stft_spec_loss = 0.0
-
-            if step > pretraining_steps:
-                # discriminator
-                d_fake = d_model(wav_fake.detach())
-                d_real = d_model(wav_real)
-                for (_, score_fake), (_, score_real) in zip(d_fake, d_real):
-                    d_loss += torch.mean(torch.sum(torch.pow(score_real - 1.0, 2), dim=[1, 2]))
-                    d_loss += torch.mean(torch.sum(torch.pow(score_fake, 2), dim=[1, 2]))
-                d_optim.zero_grad()
-                d_loss.backward()
-                d_optim.step()
-
-                # generator
-                d_fake = d_model(wav_fake)
-                for (feat_fake, score_fake), (feat_real, _) in zip(d_fake, d_real):
-                    g_loss += torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
-                    for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
-                        g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
-
-
-            mel_pred = data_mel['mel_post'].to(device)
-
-            wav_pred_fake = g_model(mel_pred)
+            wav_pred_fake = g_model(mel)[:, :, :train_cfg['segment_len']]
             mel_fake = mel_spectrogram(wav_pred_fake.squeeze(1), n_fft=1024, num_mels=80, sampling_rate=22050, hop_size=256,
                                        win_size=1024, fmin=0, fmax=8000)
-            #mel_pred_loss = 10000. * F.mse_loss(torch.exp(mel_fake), torch.exp(mel_pred))
-            mel_pred_loss = 1000. * torch.norm(torch.exp(mel_fake) - torch.exp(mel_pred), p="fro") / torch.norm(torch.exp(mel_pred), p="fro")
 
-            print(mel_pred_loss)
+            mel_fake = mel_fake[:, :, :train_cfg['segment_len']//256]
+            mel = mel[:, :, :train_cfg['segment_len']//256]
+            mel_prenet = mel_prenet[:, :, :train_cfg['segment_len']//256]
+            mel_pred_loss = torch.norm(torch.exp(mel_fake) - torch.exp(mel[:, :, :train_cfg['segment_len']//256]), p="fro") / torch.norm(torch.exp(mel), p="fro")
+            mel_l1_loss = F.l1_loss(mel_prenet, mel)
 
-            factor = 1. if step < pretraining_steps else 0.
-
-            stft_norm_loss, stft_spec_loss = multires_stft_loss(wav_fake.squeeze(1), wav_real.squeeze(1))
-            g_loss_all = g_loss + mel_pred_loss + factor * (stft_norm_loss + stft_spec_loss)
+            g_loss_all = mel_pred_loss + mel_l1_loss
 
             g_optim.zero_grad()
             g_loss_all.backward()
             g_optim.step()
 
             pbar.set_description(desc=f'Epoch: {epoch} | Step {step} '
-                                      f'| g_loss: {g_loss:#.4} '
-                                      f'| d_loss: {d_loss:#.4} '
-                                      f'| stft_norm_loss {stft_norm_loss:#.4} '
-                                      f'| mel_pred_loss {mel_pred_loss:#.4} '
-                                      f'| stft_spec_loss {stft_spec_loss:#.4} ', refresh=True)
+                                      f'| mel_pred_loss {mel_pred_loss:#.4} ', refresh=True)
 
-            summary_writer.add_scalar('generator_loss', g_loss, global_step=step)
             summary_writer.add_scalar('generator_mel_pred_loss', mel_pred_loss, global_step=step)
-            summary_writer.add_scalar('stft_norm_loss', stft_norm_loss, global_step=step)
-            summary_writer.add_scalar('stft_spec_loss', stft_spec_loss, global_step=step)
-            summary_writer.add_scalar('discriminator_loss', d_loss, global_step=step)
+            summary_writer.add_scalar('generator_mel_l1_loss', mel_pred_loss, global_step=step)
 
             if step % train_cfg['eval_steps'] == 0:
                 g_model.eval()
@@ -170,6 +132,7 @@ if __name__ == '__main__':
                 for i, val_data in enumerate(val_dataset):
                     val_mel = val_data['mel'].to(device)
                     val_mel = val_mel.unsqueeze(0)
+                    val_mel = p_model(val_mel)
                     wav_fake = g_model.inference(val_mel).squeeze().cpu().numpy()
                     wav_real = val_data['wav'].detach().squeeze().cpu().numpy()
                     wav_f = torch.tensor(wav_fake).unsqueeze(0).to(device)
@@ -192,8 +155,8 @@ if __name__ == '__main__':
                     torch.save({
                         'model_g': g_model.state_dict(),
                         'optim_g': g_optim.state_dict(),
-                        'model_d': d_model.state_dict(),
-                        'optim_d': d_optim.state_dict(),
+                        'model_p': p_model.state_dict(),
+                        'optim_p': p_optim.state_dict(),
                         'config': config,
                         'step': step
                     }, f'checkpoints/best_model_{model_name}.pt')
@@ -203,12 +166,12 @@ if __name__ == '__main__':
                 worst, best = (-9999, None), (9999, None)
                 for i, val_mel in tqdm.tqdm(enumerate(val_mel_dataloader), total=len(val_mel_dataloader)):
                     val_mel_pred = val_mel['mel_post'].to(device)
+                    val_mel_pred = p_model(val_mel_pred)
                     with torch.no_grad():
                         wav_pred_fake = g_model(val_mel_pred)
                         mel_fake = mel_spectrogram(wav_pred_fake.squeeze(1), n_fft=1024, num_mels=80, sampling_rate=22050, hop_size=256,
                                                    win_size=1024, fmin=0, fmax=8000)
-                        #mel_pred_loss = 10000. * F.mse_loss(torch.exp(mel_fake), torch.exp(mel_pred))
-                        mel_pred_loss = 1000. * torch.norm(torch.exp(mel_fake) - torch.exp(val_mel_pred), p="fro") / torch.norm(torch.exp(val_mel_pred), p="fro")
+                        mel_pred_loss = torch.norm(torch.exp(mel_fake) - torch.exp(val_mel_pred), p="fro") / torch.norm(torch.exp(val_mel_pred), p="fro")
                         if mel_pred_loss > worst[0]:
                             worst = (mel_pred_loss, wav_pred_fake)
                         if mel_pred_loss < best[0]:
@@ -239,15 +202,15 @@ if __name__ == '__main__':
                 summary_writer.add_figure('mel_generated', mel_fake_plot, global_step=step)
                 summary_writer.add_figure('mel_target', mel_real_plot, global_step=step)
 
-                mel_input_plot = plot_mel(mel_val.cpu().squeeze().numpy())
+                mel_input_plot = plot_mel(mel_val.detach().cpu().squeeze().numpy())
                 summary_writer.add_figure('mel_input', mel_input_plot, global_step=step)
 
         # epoch end
         torch.save({
             'model_g': g_model.state_dict(),
             'optim_g': g_optim.state_dict(),
-            'model_d': d_model.state_dict(),
-            'optim_d': d_optim.state_dict(),
+            'model_p': p_model.state_dict(),
+            'optim_p': p_optim.state_dict(),
             'config': config,
             'step': step
         }, f'checkpoints/latest_model__{model_name}.pt')
