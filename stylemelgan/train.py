@@ -111,11 +111,11 @@ if __name__ == '__main__':
             mel_pred_loss = torch.norm(torch.exp(mel_fake) - torch.exp(mel[:, :, :train_cfg['segment_len']//256]), p="fro") / torch.norm(torch.exp(mel), p="fro")
             mel_l1_loss = F.l1_loss(mel_prenet, mel)
 
-            g_loss_all = mel_pred_loss + mel_l1_loss
+            p_loss_all = mel_pred_loss + mel_l1_loss
 
-            g_optim.zero_grad()
-            g_loss_all.backward()
-            g_optim.step()
+            p_optim.zero_grad()
+            p_loss_all.backward()
+            p_optim.step()
 
             pbar.set_description(desc=f'Epoch: {epoch} | Step {step} '
                                       f'| mel_pred_loss {mel_pred_loss:#.4} ', refresh=True)
