@@ -121,7 +121,7 @@ if __name__ == '__main__':
                                       f'| mel_pred_loss {mel_pred_loss:#.4} ', refresh=True)
 
             summary_writer.add_scalar('generator_mel_pred_loss', mel_pred_loss, global_step=step)
-            summary_writer.add_scalar('generator_mel_l1_loss', mel_pred_loss, global_step=step)
+            summary_writer.add_scalar('generator_mel_l1_loss', mel_l1_loss, global_step=step)
 
             if step % train_cfg['eval_steps'] == 0:
                 g_model.eval()
