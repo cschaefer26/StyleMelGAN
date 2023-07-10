@@ -97,9 +97,9 @@ if __name__ == '__main__':
         pbar = tqdm.tqdm(enumerate(zip(dataloader, train_mel_dataloader), 1), total=len(dataloader))
         for i, (data, data_mel) in pbar:
             step += 1
-            mel = data['mel'].to(device)
+            mel = data_mel['mel_post'].to(device)
             
-            mel_prenet = p_model(data_mel)[:, :, :train_cfg['segment_len']//256]
+            mel_prenet = p_model(mel)[:, :, :train_cfg['segment_len']//256]
 
             wav_pred_fake = g_model(mel)[:, :, :train_cfg['segment_len']]
             mel_fake = mel_spectrogram(wav_pred_fake.squeeze(1), n_fft=1024, num_mels=80, sampling_rate=22050, hop_size=256,
