@@ -111,9 +111,10 @@ if __name__ == '__main__':
             mel = mel[:, :, :train_cfg['segment_len']//256]
             mel_prenet = mel_prenet[:, :, :train_cfg['segment_len']//256]
             mel_pred_loss = 10. * torch.norm(torch.exp(mel_fake) - torch.exp(mel[:, :, :train_cfg['segment_len']//256]), p="fro") / torch.norm(torch.exp(mel), p="fro")
+            mel_pred_loss_log = torch.norm(mel_fake - mel[:, :, :train_cfg['segment_len']//256], p="fro") / torch.norm(mel, p="fro")
             mel_l1_loss = F.l1_loss(mel_prenet, mel)
 
-            p_loss_all = mel_pred_loss + mel_l1_loss
+            p_loss_all = mel_pred_loss + mel_l1_loss + mel_pred_loss_log
 
             p_optim.zero_grad()
             p_loss_all.backward()
@@ -123,6 +124,7 @@ if __name__ == '__main__':
                                       f'| mel_pred_loss {mel_pred_loss:#.4} ', refresh=True)
 
             summary_writer.add_scalar('generator_mel_pred_loss', mel_pred_loss, global_step=step)
+            summary_writer.add_scalar('generator_mel_pred_log_loss', mel_pred_loss_log, global_step=step)
             summary_writer.add_scalar('generator_mel_l1_loss', mel_l1_loss, global_step=step)
 
             if step % train_cfg['eval_steps'] == 0:
@@ -191,6 +193,7 @@ if __name__ == '__main__':
                     print(f'\nnew best val exp loss: {best_stft}')
                     torch.save({
                         'model_g': g_model.state_dict(),
+                        'model_p': p_model.state_dict(),
                         'config': config,
                         'step': step
                     }, f'checkpoints/best_model_exp_{best_exp:#.2}_{model_name}.pt')
