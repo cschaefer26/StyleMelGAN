@@ -57,8 +57,8 @@ if __name__ == '__main__':
         checkpoint = torch.load(f'checkpoints/latest_model__{model_name}.pt', map_location=device)
         g_model.load_state_dict(checkpoint['model_g'])
         g_optim.load_state_dict(checkpoint['optim_g'])
-        p_model.load_state_dict(checkpoint['model_p'])
-        p_optim.load_state_dict(checkpoint['optim_p'])
+        ##p_model.load_state_dict(checkpoint['model_p'])
+        #p_optim.load_state_dict(checkpoint['optim_p'])
         step = checkpoint['step']
         print(f'Loaded model with step {step}')
     except Exception as e:
@@ -99,7 +99,7 @@ if __name__ == '__main__':
         pbar = tqdm.tqdm(enumerate(zip(dataloader, train_mel_dataloader), 1), total=len(dataloader))
         for i, (data, data_mel) in pbar:
             step += 1
-            mel = data_mel['mel_post'].to(device)
+            mel = data['mel'].to(device)
             
             mel_prenet = p_model(mel)[:, :, :train_cfg['segment_len']//256]
 
@@ -110,8 +110,9 @@ if __name__ == '__main__':
             mel_fake = mel_fake[:, :, :train_cfg['segment_len']//256]
             mel = mel[:, :, :train_cfg['segment_len']//256]
             mel_prenet = mel_prenet[:, :, :train_cfg['segment_len']//256]
-            mel_pred_loss = 10. * torch.norm(torch.exp(mel_fake) - torch.exp(mel[:, :, :train_cfg['segment_len']//256]), p="fro") / torch.norm(torch.exp(mel), p="fro")
-            mel_pred_loss_log = torch.norm(mel_fake - mel[:, :, :train_cfg['segment_len']//256], p="fro") / torch.norm(mel, p="fro")
+
+            mel_pred_loss = 10. * torch.norm(torch.exp(mel_fake) - torch.exp(mel), p="fro") / torch.norm(torch.exp(mel), p="fro")
+            mel_pred_loss_log = torch.norm(mel_fake - mel, p="fro") / torch.norm(mel, p="fro")
             mel_l1_loss = F.l1_loss(mel_prenet, mel)
 
             p_loss_all = mel_pred_loss + mel_l1_loss + mel_pred_loss_log
