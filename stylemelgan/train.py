@@ -99,7 +99,7 @@ if __name__ == '__main__':
         pbar = tqdm.tqdm(enumerate(zip(dataloader, train_mel_dataloader), 1), total=len(dataloader))
         for i, (data, data_mel) in pbar:
             step += 1
-            mel = data['mel'].to(device)
+            mel = data_mel['mel_post'].to(device)
             
             mel_prenet = p_model(mel)[:, :, :train_cfg['segment_len']//256]
 
@@ -137,7 +137,7 @@ if __name__ == '__main__':
                 val_wavs = []
 
                 for i, val_data in enumerate(val_dataset):
-                    val_mel = val_data['mel'].to(device)
+                    val_mel = val_data['mel_post'].to(device)
                     val_mel = val_mel.unsqueeze(0)
                     with torch.no_grad():
                         val_mel_pred = p_model(val_mel)
