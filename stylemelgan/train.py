@@ -174,8 +174,8 @@ if __name__ == '__main__':
                 worst, best = (-9999, None), (9999, None)
                 for i, val_mel in tqdm.tqdm(enumerate(val_mel_dataloader), total=len(val_mel_dataloader)):
                     val_mel = val_mel['mel_post'].to(device)
-                    val_mel_pred = p_model(val_mel)
                     with torch.no_grad():
+                        val_mel_pred = p_model(val_mel)
                         wav_pred_fake = g_model(val_mel_pred)
                         mel_fake = mel_spectrogram(wav_pred_fake.squeeze(1), n_fft=1024, num_mels=80, sampling_rate=22050, hop_size=256,
                                                    win_size=1024, fmin=0, fmax=8000)
