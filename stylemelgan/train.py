@@ -180,7 +180,7 @@ if __name__ == '__main__':
                         mel_fake = mel_spectrogram(wav_pred_fake.squeeze(1), n_fft=1024, num_mels=80, sampling_rate=22050, hop_size=256,
                                                    win_size=1024, fmin=0, fmax=8000)
                         #mel_pred_loss = torch.norm(torch.exp(mel_fake) - torch.exp(val_mel), p="fro") / torch.norm(torch.exp(val_mel), p="fro")
-                        mel_pred_loss = 1000. * F.mse_loss(torch.exp(mel_fake), torch.exp(mel))
+                        mel_pred_loss = 1000. * F.mse_loss(torch.exp(mel_fake), torch.exp(val_mel))
                         if mel_pred_loss > worst[0]:
                             worst = (mel_pred_loss, wav_pred_fake)
                         if mel_pred_loss < best[0]:
