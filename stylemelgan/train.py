@@ -111,8 +111,10 @@ if __name__ == '__main__':
             mel = mel[:, :, :train_cfg['segment_len']//256]
             mel_prenet = mel_prenet[:, :, :train_cfg['segment_len']//256]
 
-            mel_pred_loss = 10. * torch.norm(torch.exp(mel_fake) - torch.exp(mel), p="fro") / torch.norm(torch.exp(mel), p="fro")
-            mel_pred_loss_log = torch.norm(mel_fake - mel, p="fro") / torch.norm(mel, p="fro")
+            #mel_pred_loss = 10. * torch.norm(torch.exp(mel_fake) - torch.exp(mel), p="fro") / torch.norm(torch.exp(mel), p="fro")
+            mel_pred_loss = 1000. * F.mse_loss(torch.exp(mel_fake), torch.exp(mel))
+            mel_pred_loss_log = F.mse_loss(mel_fake, mel)
+            #mel_pred_loss_log = torch.norm(mel_fake - mel, p="fro") / torch.norm(mel, p="fro")
             mel_l1_loss = F.l1_loss(mel_prenet, mel)
 
             p_loss_all = mel_pred_loss + mel_l1_loss + mel_pred_loss_log
@@ -177,7 +179,8 @@ if __name__ == '__main__':
                         wav_pred_fake = g_model(val_mel_pred)
                         mel_fake = mel_spectrogram(wav_pred_fake.squeeze(1), n_fft=1024, num_mels=80, sampling_rate=22050, hop_size=256,
                                                    win_size=1024, fmin=0, fmax=8000)
-                        mel_pred_loss = torch.norm(torch.exp(mel_fake) - torch.exp(val_mel), p="fro") / torch.norm(torch.exp(val_mel), p="fro")
+                        #mel_pred_loss = torch.norm(torch.exp(mel_fake) - torch.exp(val_mel), p="fro") / torch.norm(torch.exp(val_mel), p="fro")
+                        mel_pred_loss = 1000. * F.mse_loss(torch.exp(mel_fake), torch.exp(mel))
                         if mel_pred_loss > worst[0]:
                             worst = (mel_pred_loss, wav_pred_fake)
                         if mel_pred_loss < best[0]:
